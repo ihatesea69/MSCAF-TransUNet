@@ -10,17 +10,17 @@ This repo currently centers on **MSCAF-TransUNet** and its related ablations on 
 
 - `pre_hidden`: refine selected CNN scales and fuse them into the hidden feature before patch projection
 - `cnn_fusion`: refine selected CNN skip features and fuse multiple CNN scales back into the hidden feature
+- `ra_skip`: apply Reverse Attention to selected decoder skip connections for boundary-focused ablations
 
-## Current result snapshot
+## Result snapshot
 
-Latest evaluated **MSCAF-TransUNet** run:
+Tracked result records live in [docs/results/results_summary.md](docs/results/results_summary.md) and [docs/results/run_registry.json](docs/results/run_registry.json). Large binary outputs are kept outside Git.
 
-- Method: `MSCAF-TransUNet`
-- Implementation mode: `cnn_fusion`
-- Scales: `1/8,1/4,1/2`
-- Mean Dice: `76.61%`
-- Mean HD95: `28.80`
-- Better than the original TransUNet paper on `HD95`, `Liver`, `Pancreas`, `Spleen`, and `Stomach`
+Current completed runs:
+
+- `mscaf_cnn_fusion_3scale`: `cnn_fusion` on `1/8,1/4,1/2`, Mean Dice `76.61%`, Mean HD95 `28.80`
+- `pre_hidden_1_16_r16_run_01`: `pre_hidden` on `1/16`, Mean Dice `78.3119%`, Mean HD95 `29.879884`, Pancreas Dice `0.549484`
+- `reverse_attention_s0_r4_run_01`: `pre_hidden` on `1/16` with RA skip `0`, reduction `4`, Mean Dice `78.1807%`, Mean HD95 `31.889628`, Pancreas Dice `0.553947`
 
 Reference baseline from the earlier cleaned reproduction:
 
@@ -51,6 +51,7 @@ datasets/          dataset package and Synapse loader
 splits/            explicit train/test split metadata
 networks/          TransUNet model + hybrid encoder attention modules
 notebooks/         Colab notebooks for Drive bootstrap and end-to-end experiments
+docs/results/      lightweight result registry and artifact manifest
 train.py           training entrypoint
 test.py            evaluation entrypoint
 trainer.py         training loop with epoch-level resume checkpointing
@@ -118,7 +119,20 @@ python train.py ^
   --dataset Synapse ^
   --vit_name R50-ViT-B_16 ^
   --attention_mode pre_hidden ^
-  --attention_scales 1/8
+  --attention_scales 1/16
+```
+
+Reverse Attention experiment:
+
+```bash
+python train.py ^
+  --dataset Synapse ^
+  --vit_name R50-ViT-B_16 ^
+  --attention_mode pre_hidden ^
+  --attention_scales 1/16 ^
+  --ra_mode ra_skip ^
+  --ra_scales 0 ^
+  --ra_reduction 4
 ```
 
 Baseline ablation:
@@ -148,13 +162,23 @@ python test.py --dataset Synapse --vit_name R50-ViT-B_16 --is_savenii
 For reproducibility on Google Colab:
 
 - [notebooks/transunet-drive-data-setup.ipynb](notebooks/transunet-drive-data-setup.ipynb): prepare the Synapse dataset and pretrained TransUNet weight on Google Drive
-- [notebooks/transunet-cnn-attention-research-colab.ipynb](notebooks/transunet-cnn-attention-research-colab.ipynb): run the MSCAF-TransUNet experiment end-to-end on Colab with live logs and checkpoint resume
+- [notebooks/transunet-cnn-attention-research-colab.ipynb](notebooks/transunet-cnn-attention-research-colab.ipynb): run the primary MSCAF-TransUNet `cnn_fusion` experiment end-to-end
+- [notebooks/transunet-mscaf-reverse-attention.ipynb](notebooks/transunet-mscaf-reverse-attention.ipynb): completed Reverse Attention `s0/r4` notebook with retained metrics
+- [notebooks/reverse_attention_variants/transunet-mscaf-ra-s1-r4.ipynb](notebooks/reverse_attention_variants/transunet-mscaf-ra-s1-r4.ipynb): planned RA skip `1`, reduction `4`
+- [notebooks/reverse_attention_variants/transunet-mscaf-ra-s0-r8.ipynb](notebooks/reverse_attention_variants/transunet-mscaf-ra-s0-r8.ipynb): planned RA skip `0`, reduction `8`
+- [notebooks/reverse_attention_variants/transunet-mscaf-ra-s01-r8.ipynb](notebooks/reverse_attention_variants/transunet-mscaf-ra-s01-r8.ipynb): planned RA skips `0,1`, reduction `8`
+
+## Artifact policy
+
+- Commit source code, split metadata, notebooks, and lightweight result registries.
+- Keep checkpoints, prediction volumes, compiled reports, generated figures, paper PDFs, and local work archives outside Git.
+- Reference retained binary outputs from README or `docs/results/` using Drive, Colab, or GitHub Release paths.
 
 ## Notes
 
 - `trainer.py` saves `latest_checkpoint.pth` every epoch and can resume automatically.
 - Package markers were added to `datasets/` and `networks/` so Colab does not confuse them with third-party packages.
-- The repo intentionally no longer contains AWS deployment code, CloudFormation templates, or SageMaker helpers.
+- The repo intentionally no longer contains AWS deployment code, CloudFormation templates, SageMaker helpers, local archives, or generated binary reports.
 
 ## Citation
 
