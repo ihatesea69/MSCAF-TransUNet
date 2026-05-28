@@ -399,6 +399,56 @@ class CNNFeatureFusion(nn.Module):
         return hidden_feature, updated_feature_map
 
 
+class BottleNeckBlock(nn.Module):
+    """Lightweight 1x1 → 3x3 → 1x1 bottleneck for feature refinement."""
+
+    def __init__(self, channels, reduction=4):
+        super().__init__()
+        if reduction <= 0:
+            raise ValueError("Reverse attention bottleneck reduction must be greater than 0.")
+        mid_channels = max(channels // reduction, 1)
+        self.block = nn.Sequential(
+            nn.Conv2d(channels, mid_channels, 1, bias=False),
+            nn.BatchNorm2d(mid_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(mid_channels, mid_channels, 3, padding=1, bias=False),
+            nn.BatchNorm2d(mid_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(mid_channels, channels, 1, bias=False),
+            nn.BatchNorm2d(channels),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
+
+class ReverseAttentionModule(nn.Module):
+    """Apply reverse attention to decoder skip features."""
+
+    def __init__(self, channels, reduction=4):
+        super().__init__()
+        self.conv = nn.Conv2d(channels, channels, 3, padding=1, groups=channels, bias=False)
+        self.bn = nn.BatchNorm2d(channels)
+        self.bottleneck = BottleNeckBlock(channels, reduction)
+
+    def forward(self, x):
+        reverse_map = 1 - torch.sigmoid(self.bn(self.conv(x)))
+        refined = self.bottleneck(x * reverse_map)
+        return refined + x
+
+
+class ReverseAttentionBridge(nn.Module):
+    """Apply reverse attention to the decoder input feature map."""
+
+    def __init__(self, channels, reduction=4):
+        super().__init__()
+        self.reverse_attention = ReverseAttentionModule(channels, reduction)
+
+    def forward(self, x):
+        return self.reverse_attention(x)
+
+
 class DecoderBlock(nn.Module):
     def __init__(
             self,
@@ -457,18 +507,65 @@ class DecoderCup(nn.Module):
         in_channels = [head_channels] + list(decoder_channels[:-1])
         out_channels = decoder_channels
 
-        if self.config.n_skip != 0:
-            skip_channels = self.config.skip_channels
-            for i in range(4-self.config.n_skip):  # re-select the skip channels according to n_skip
-                skip_channels[3-i]=0
+        skip_channels_full = list(getattr(self.config, "skip_channels", [0, 0, 0, 0]))
+        skip_indices = getattr(self.config, "skip_indices", None)
 
+        if skip_indices:
+            self.skip_indices = list(skip_indices)
+            effective_skip_channels = [skip_channels_full[i] for i in self.skip_indices]
+        elif self.config.n_skip != 0:
+            skip_channels = skip_channels_full
+            for i in range(4 - self.config.n_skip):  # re-select the skip channels according to n_skip
+                skip_channels[3 - i] = 0
+            self.skip_indices = list(range(self.config.n_skip))
+            effective_skip_channels = [skip_channels[i] for i in range(self.config.n_skip)]
         else:
-            skip_channels=[0,0,0,0]
+            self.skip_indices = []
+            effective_skip_channels = []
+
+        skip_channels_for_blocks = [0 for _ in in_channels]
+        if skip_indices:
+            for feature_idx in self.skip_indices:
+                if feature_idx < len(skip_channels_for_blocks):
+                    skip_channels_for_blocks[feature_idx] = skip_channels_full[feature_idx]
+        else:
+            for idx, ch in enumerate(effective_skip_channels):
+                if idx < len(skip_channels_for_blocks):
+                    skip_channels_for_blocks[idx] = ch
 
         blocks = [
-            DecoderBlock(in_ch, out_ch, sk_ch) for in_ch, out_ch, sk_ch in zip(in_channels, out_channels, skip_channels)
+            DecoderBlock(in_ch, out_ch, sk_ch)
+            for in_ch, out_ch, sk_ch in zip(in_channels, out_channels, skip_channels_for_blocks)
         ]
         self.blocks = nn.ModuleList(blocks)
+
+        # Reverse Attention modules
+        ra_mode = getattr(config, 'reverse_attention_mode', 'none')
+        ra_scales = getattr(config, 'reverse_attention_scales', [])
+        ra_reduction = getattr(config, 'reverse_attention_reduction', 4)
+
+        self.ra_bridge = None
+
+        if ra_mode == 'ra_skip':
+            self.ra_modules = nn.ModuleDict()
+            for scale_idx in ra_scales:
+                if scale_idx < 0:
+                    raise ValueError(f"RA scale index must be non-negative, got {scale_idx}")
+                if scale_idx >= len(skip_channels_full):
+                    raise ValueError(f"RA scale index {scale_idx} >= max skip index ({len(skip_channels_full) - 1})")
+                if self.skip_indices and scale_idx not in self.skip_indices:
+                    raise ValueError(f"RA scale index {scale_idx} not enabled in skip_indices {self.skip_indices}")
+                ch = skip_channels_full[scale_idx]
+                if ch <= 0:
+                    raise ValueError(f"RA scale index {scale_idx} maps to inactive skip channel {ch}")
+                self.ra_modules[str(scale_idx)] = ReverseAttentionModule(ch, ra_reduction)
+        elif ra_mode == 'ra_bridge':
+            self.ra_modules = None
+            self.ra_bridge = ReverseAttentionBridge(head_channels, ra_reduction)
+        elif ra_mode == 'none':
+            self.ra_modules = None
+        else:
+            raise ValueError(f"Unsupported reverse attention mode: {ra_mode}")
 
     def forward(self, hidden_states, features=None):
         B, n_patch, hidden = hidden_states.size()  # reshape from (B, n_patch, hidden) to (B, h, w, hidden)
@@ -476,11 +573,15 @@ class DecoderCup(nn.Module):
         x = hidden_states.permute(0, 2, 1)
         x = x.contiguous().view(B, hidden, h, w)
         x = self.conv_more(x)
+        if self.ra_bridge is not None:
+            x = self.ra_bridge(x)
         for i, decoder_block in enumerate(self.blocks):
-            if features is not None:
-                skip = features[i] if (i < self.config.n_skip) else None
+            if features is not None and i in self.skip_indices:
+                skip = features[i]
             else:
                 skip = None
+            if skip is not None and self.ra_modules is not None and str(i) in self.ra_modules:
+                skip = self.ra_modules[str(i)](skip)
             x = decoder_block(x, skip=skip)
         return x
 
