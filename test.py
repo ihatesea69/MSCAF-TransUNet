@@ -57,10 +57,10 @@ parser.add_argument('--attention_scales', type=str,
 parser.add_argument('--attention_reduction', type=int,
                     default=16, help='channel reduction used by the CNN attention blocks')
 parser.add_argument('--ra_mode', type=str, default='none',
-                    choices=['none', 'ra_skip', 'ra_bridge'],
-                    help='reverse attention mode for decoder skip connections')
+                    choices=['none', 'ra_skip', 'ra_bridge', 'ra_fusion'],
+                    help='reverse attention mode for decoder bridge, skip, or post-fusion features')
 parser.add_argument('--ra_scales', type=str, default='0',
-                    help='comma-separated skip indices for RA, e.g. "0" or "0,1,2"')
+                    help='comma-separated skip or fusion block indices for RA, e.g. "0" or "0,1,2"')
 parser.add_argument('--ra_reduction', type=int, default=4,
                     help='bottleneck reduction ratio for reverse attention')
 args = parser.parse_args()

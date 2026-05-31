@@ -71,6 +71,19 @@
       "status": "pending",
       "notebook": "notebooks/transunet-prehidden-1-16-rerun.ipynb",
       "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16"
+    },
+    {
+      "run_id": "reverse_bottleneck_fusion_s0_r4_run_01",
+      "status": "planned",
+      "method": "MSCAF-TransUNet + reverse bottleneck fusion",
+      "attention_mode": "pre_hidden",
+      "attention_scales": ["1/16"],
+      "attention_reduction": 16,
+      "ra_mode": "ra_fusion",
+      "ra_scales": [0],
+      "ra_reduction": 4,
+      "notebook": "notebooks/transunet-reverse-bottleneck-fusion.ipynb",
+      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4"
     }
   ]
 }

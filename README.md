@@ -10,6 +10,7 @@ This repo currently centers on **MSCAF-TransUNet** and its related ablations on 
 
 - `pre_hidden`: refine selected CNN scales and fuse them into the hidden feature before patch projection
 - `cnn_fusion`: refine selected CNN skip features and fuse multiple CNN scales back into the hidden feature
+- `ra_fusion`: apply reverse attention plus bottleneck immediately after the first decoder fusion at `1/8`
 - Historical ablation: `ra_skip` applies Reverse Attention to selected decoder skip connections
 
 ## Result snapshot
@@ -122,6 +123,19 @@ python train.py ^
   --attention_scales 1/16
 ```
 
+Advisor-requested reverse bottleneck fusion experiment:
+
+```bash
+python train.py ^
+  --dataset Synapse ^
+  --vit_name R50-ViT-B_16 ^
+  --attention_mode pre_hidden ^
+  --attention_scales 1/16 ^
+  --ra_mode ra_fusion ^
+  --ra_scales 0 ^
+  --ra_reduction 4
+```
+
 Baseline ablation:
 
 ```bash
@@ -151,6 +165,7 @@ For reproducibility on Google Colab:
 - [notebooks/transunet-drive-data-setup.ipynb](notebooks/transunet-drive-data-setup.ipynb): prepare the Synapse dataset and pretrained TransUNet weight on Google Drive
 - [notebooks/transunet-cnn-attention-research-colab.ipynb](notebooks/transunet-cnn-attention-research-colab.ipynb): run the primary MSCAF-TransUNet `cnn_fusion` experiment end-to-end
 - [notebooks/transunet-prehidden-1-16-rerun.ipynb](notebooks/transunet-prehidden-1-16-rerun.ipynb): run the pending non-RA `pre_hidden` repetitions at scale `1/16`
+- [notebooks/transunet-reverse-bottleneck-fusion.ipynb](notebooks/transunet-reverse-bottleneck-fusion.ipynb): run the advisor-requested reverse attention + bottleneck fusion at the first `1/8` decoder merge
 - [notebooks/transunet-mscaf-reverse-attention.ipynb](notebooks/transunet-mscaf-reverse-attention.ipynb): historical completed Reverse Attention `s0/r4` artifact with retained metrics
 
 ## Artifact policy

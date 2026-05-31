@@ -1,6 +1,6 @@
 VALID_ATTENTION_MODES = ("none", "pre_hidden", "cnn_fusion")
 VALID_ATTENTION_SCALES = ("1/2", "1/4", "1/8", "1/16")
-VALID_REVERSE_ATTENTION_MODES = ("none", "ra_skip", "ra_bridge")
+VALID_REVERSE_ATTENTION_MODES = ("none", "ra_skip", "ra_bridge", "ra_fusion")
 
 
 def parse_attention_scales(mode, scales_arg):

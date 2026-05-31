@@ -424,7 +424,7 @@ class BottleNeckBlock(nn.Module):
 
 
 class ReverseAttentionModule(nn.Module):
-    """Apply reverse attention to decoder skip features."""
+    """Apply reverse attention and bottleneck refinement to decoder features."""
 
     def __init__(self, channels, reduction=4):
         super().__init__()
@@ -455,9 +455,11 @@ class DecoderBlock(nn.Module):
             in_channels,
             out_channels,
             skip_channels=0,
+            fusion_attention=None,
             use_batchnorm=True,
     ):
         super().__init__()
+        self.fusion_attention = fusion_attention
         self.conv1 = Conv2dReLU(
             in_channels + skip_channels,
             out_channels,
@@ -478,6 +480,8 @@ class DecoderBlock(nn.Module):
         x = self.up(x)
         if skip is not None:
             x = torch.cat([x, skip], dim=1)
+        if self.fusion_attention is not None:
+            x = self.fusion_attention(x)
         x = self.conv1(x)
         x = self.conv2(x)
         return x
@@ -533,18 +537,13 @@ class DecoderCup(nn.Module):
                 if idx < len(skip_channels_for_blocks):
                     skip_channels_for_blocks[idx] = ch
 
-        blocks = [
-            DecoderBlock(in_ch, out_ch, sk_ch)
-            for in_ch, out_ch, sk_ch in zip(in_channels, out_channels, skip_channels_for_blocks)
-        ]
-        self.blocks = nn.ModuleList(blocks)
-
-        # Reverse Attention modules
         ra_mode = getattr(config, 'reverse_attention_mode', 'none')
         ra_scales = getattr(config, 'reverse_attention_scales', [])
         ra_reduction = getattr(config, 'reverse_attention_reduction', 4)
 
         self.ra_bridge = None
+        self.ra_modules = None
+        fusion_ra_modules = {}
 
         if ra_mode == 'ra_skip':
             self.ra_modules = nn.ModuleDict()
@@ -560,12 +559,30 @@ class DecoderCup(nn.Module):
                     raise ValueError(f"RA scale index {scale_idx} maps to inactive skip channel {ch}")
                 self.ra_modules[str(scale_idx)] = ReverseAttentionModule(ch, ra_reduction)
         elif ra_mode == 'ra_bridge':
-            self.ra_modules = None
             self.ra_bridge = ReverseAttentionBridge(head_channels, ra_reduction)
+        elif ra_mode == 'ra_fusion':
+            for block_idx in ra_scales:
+                if block_idx < 0:
+                    raise ValueError(f"RA fusion block index must be non-negative, got {block_idx}")
+                if block_idx >= len(in_channels):
+                    raise ValueError(f"RA fusion block index {block_idx} >= decoder block count ({len(in_channels)})")
+                if block_idx not in self.skip_indices:
+                    raise ValueError(f"RA fusion block index {block_idx} has no enabled skip connection in {self.skip_indices}")
+                sk_ch = skip_channels_for_blocks[block_idx]
+                if sk_ch <= 0:
+                    raise ValueError(f"RA fusion block index {block_idx} maps to inactive skip channel {sk_ch}")
+                fusion_channels = in_channels[block_idx] + sk_ch
+                fusion_ra_modules[block_idx] = ReverseAttentionModule(fusion_channels, ra_reduction)
         elif ra_mode == 'none':
-            self.ra_modules = None
+            pass
         else:
             raise ValueError(f"Unsupported reverse attention mode: {ra_mode}")
+
+        blocks = [
+            DecoderBlock(in_ch, out_ch, sk_ch, fusion_attention=fusion_ra_modules.get(idx))
+            for idx, (in_ch, out_ch, sk_ch) in enumerate(zip(in_channels, out_channels, skip_channels_for_blocks))
+        ]
+        self.blocks = nn.ModuleList(blocks)
 
     def forward(self, hidden_states, features=None):
         B, n_patch, hidden = hidden_states.size()  # reshape from (B, n_patch, hidden) to (B, h, w, hidden)

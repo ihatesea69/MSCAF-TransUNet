@@ -17,6 +17,7 @@ This registry keeps lightweight, source-control friendly result records. Large b
 |---|---|---|---|
 | `pre_hidden_1_16_r16_run_02` | pending | `notebooks/transunet-prehidden-1-16-rerun.ipynb` | `_attn-pre_hidden-1_16-r16` |
 | `pre_hidden_1_16_r16_run_03` | pending | `notebooks/transunet-prehidden-1-16-rerun.ipynb` | `_attn-pre_hidden-1_16-r16` |
+| `reverse_bottleneck_fusion_s0_r4_run_01` | planned | `notebooks/transunet-reverse-bottleneck-fusion.ipynb` | `_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4` |
 
 ## Artifact Policy
 
