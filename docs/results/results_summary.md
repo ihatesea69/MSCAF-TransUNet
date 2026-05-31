@@ -15,6 +15,21 @@ This registry keeps lightweight, source-control friendly result records. Large b
 
 The two latest notebook completions resumed existing Drive checkpoints: `pre_hidden_1_16_r16_run_02` from epoch `145` and `reverse_bottleneck_fusion_s0_r4_run_01` from epoch `148`.
 
+## Accuracy Backfill
+
+Accuracy cannot be derived from the retained Dice and HD95 values. Run `notebooks/transunet-calculate-artifact-accuracy.ipynb` to calculate it from the NIfTI predictions stored inside Drive artifact zips.
+
+The post-processing notebook exports:
+
+- `voxel_accuracy`: all correctly classified voxels divided by all voxels, including background
+- `foreground_voxel_accuracy`: correctly classified organ voxels divided by all ground-truth organ voxels
+- `mean_foreground_accuracy`: macro average of per-organ recall across the 8 Synapse organs
+- `pancreas_accuracy`: recall for Synapse class `6`
+
+Use `mean_foreground_accuracy` and `pancreas_accuracy` in research comparisons. `voxel_accuracy` is retained for completeness but can be dominated by background voxels.
+
+The two `pre_hidden` runs share one snapshot zip filename. If Drive no longer contains a separately preserved run `01` zip, leave that row as missing rather than assigning the run `02` accuracy to both rows.
+
 ## Pending Or Planned Runs
 
 | Run | Status | Notebook | Target snapshot suffix |
