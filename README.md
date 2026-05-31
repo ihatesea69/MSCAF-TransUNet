@@ -10,7 +10,7 @@ This repo currently centers on **MSCAF-TransUNet** and its related ablations on 
 
 - `pre_hidden`: refine selected CNN scales and fuse them into the hidden feature before patch projection
 - `cnn_fusion`: refine selected CNN skip features and fuse multiple CNN scales back into the hidden feature
-- `ra_skip`: apply Reverse Attention to selected decoder skip connections for boundary-focused ablations
+- Historical ablation: `ra_skip` applies Reverse Attention to selected decoder skip connections
 
 ## Result snapshot
 
@@ -122,19 +122,6 @@ python train.py ^
   --attention_scales 1/16
 ```
 
-Reverse Attention experiment:
-
-```bash
-python train.py ^
-  --dataset Synapse ^
-  --vit_name R50-ViT-B_16 ^
-  --attention_mode pre_hidden ^
-  --attention_scales 1/16 ^
-  --ra_mode ra_skip ^
-  --ra_scales 0 ^
-  --ra_reduction 4
-```
-
 Baseline ablation:
 
 ```bash
@@ -163,10 +150,8 @@ For reproducibility on Google Colab:
 
 - [notebooks/transunet-drive-data-setup.ipynb](notebooks/transunet-drive-data-setup.ipynb): prepare the Synapse dataset and pretrained TransUNet weight on Google Drive
 - [notebooks/transunet-cnn-attention-research-colab.ipynb](notebooks/transunet-cnn-attention-research-colab.ipynb): run the primary MSCAF-TransUNet `cnn_fusion` experiment end-to-end
-- [notebooks/transunet-mscaf-reverse-attention.ipynb](notebooks/transunet-mscaf-reverse-attention.ipynb): completed Reverse Attention `s0/r4` notebook with retained metrics
-- [notebooks/reverse_attention_variants/transunet-mscaf-ra-s1-r4.ipynb](notebooks/reverse_attention_variants/transunet-mscaf-ra-s1-r4.ipynb): planned RA skip `1`, reduction `4`
-- [notebooks/reverse_attention_variants/transunet-mscaf-ra-s0-r8.ipynb](notebooks/reverse_attention_variants/transunet-mscaf-ra-s0-r8.ipynb): planned RA skip `0`, reduction `8`
-- [notebooks/reverse_attention_variants/transunet-mscaf-ra-s01-r8.ipynb](notebooks/reverse_attention_variants/transunet-mscaf-ra-s01-r8.ipynb): planned RA skips `0,1`, reduction `8`
+- [notebooks/transunet-prehidden-1-16-rerun.ipynb](notebooks/transunet-prehidden-1-16-rerun.ipynb): run the pending non-RA `pre_hidden` repetitions at scale `1/16`
+- [notebooks/transunet-mscaf-reverse-attention.ipynb](notebooks/transunet-mscaf-reverse-attention.ipynb): historical completed Reverse Attention `s0/r4` artifact with retained metrics
 
 ## Artifact policy
 

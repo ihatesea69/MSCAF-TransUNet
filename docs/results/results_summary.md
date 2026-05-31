@@ -15,11 +15,8 @@ This registry keeps lightweight, source-control friendly result records. Large b
 
 | Run | Status | Notebook | Target snapshot suffix |
 |---|---|---|---|
-| `pre_hidden_1_16_r16_run_02` | pending | `notebooks/transunet-cnn-attention-research-colab.ipynb` | `_attn-pre_hidden-1_16-r16` |
-| `pre_hidden_1_16_r16_run_03` | pending | `notebooks/transunet-cnn-attention-research-colab.ipynb` | `_attn-pre_hidden-1_16-r16` |
-| `reverse_attention_s1_r4` | planned | `notebooks/reverse_attention_variants/transunet-mscaf-ra-s1-r4.ipynb` | `_attn-pre_hidden-1_16-r16_ra-ra_skip-s1-r4` |
-| `reverse_attention_s0_r8` | planned | `notebooks/reverse_attention_variants/transunet-mscaf-ra-s0-r8.ipynb` | `_attn-pre_hidden-1_16-r16_ra-ra_skip-s0-r8` |
-| `reverse_attention_s01_r8` | planned | `notebooks/reverse_attention_variants/transunet-mscaf-ra-s01-r8.ipynb` | `_attn-pre_hidden-1_16-r16_ra-ra_skip-s01-r8` |
+| `pre_hidden_1_16_r16_run_02` | pending | `notebooks/transunet-prehidden-1-16-rerun.ipynb` | `_attn-pre_hidden-1_16-r16` |
+| `pre_hidden_1_16_r16_run_03` | pending | `notebooks/transunet-prehidden-1-16-rerun.ipynb` | `_attn-pre_hidden-1_16-r16` |
 
 ## Artifact Policy
 
