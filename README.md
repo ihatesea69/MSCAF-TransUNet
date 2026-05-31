@@ -21,7 +21,9 @@ Current completed runs:
 
 - `mscaf_cnn_fusion_3scale`: `cnn_fusion` on `1/8,1/4,1/2`, Mean Dice `76.61%`, Mean HD95 `28.80`
 - `pre_hidden_1_16_r16_run_01`: `pre_hidden` on `1/16`, Mean Dice `78.3119%`, Mean HD95 `29.879884`, Pancreas Dice `0.549484`
+- `pre_hidden_1_16_r16_run_02`: `pre_hidden` on `1/16`, Mean Dice `78.0560%`, Mean HD95 `28.846281`, Pancreas Dice `0.564749`
 - `reverse_attention_s0_r4_run_01`: `pre_hidden` on `1/16` with RA skip `0`, reduction `4`, Mean Dice `78.1807%`, Mean HD95 `31.889628`, Pancreas Dice `0.553947`
+- `reverse_bottleneck_fusion_s0_r4_run_01`: `pre_hidden` on `1/16` with post-fusion RA block `0`, reduction `4`, Mean Dice `77.8149%`, Mean HD95 `28.049328`, Pancreas Dice `0.571350`
 
 Reference baseline from the earlier cleaned reproduction:
 
@@ -164,8 +166,8 @@ For reproducibility on Google Colab:
 
 - [notebooks/transunet-drive-data-setup.ipynb](notebooks/transunet-drive-data-setup.ipynb): prepare the Synapse dataset and pretrained TransUNet weight on Google Drive
 - [notebooks/transunet-cnn-attention-research-colab.ipynb](notebooks/transunet-cnn-attention-research-colab.ipynb): run the primary MSCAF-TransUNet `cnn_fusion` experiment end-to-end
-- [notebooks/transunet-prehidden-1-16-rerun.ipynb](notebooks/transunet-prehidden-1-16-rerun.ipynb): run the pending non-RA `pre_hidden` repetitions at scale `1/16`
-- [notebooks/transunet-reverse-bottleneck-fusion.ipynb](notebooks/transunet-reverse-bottleneck-fusion.ipynb): run the advisor-requested reverse attention + bottleneck fusion at the first `1/8` decoder merge
+- [notebooks/transunet-prehidden-1-16-rerun.ipynb](notebooks/transunet-prehidden-1-16-rerun.ipynb): completed non-RA `pre_hidden` run `02`; reuse only for the remaining fresh run `03`
+- [notebooks/transunet-reverse-bottleneck-fusion.ipynb](notebooks/transunet-reverse-bottleneck-fusion.ipynb): completed advisor-requested reverse attention + bottleneck fusion at the first `1/8` decoder merge
 - [notebooks/transunet-mscaf-reverse-attention.ipynb](notebooks/transunet-mscaf-reverse-attention.ipynb): historical completed Reverse Attention `s0/r4` artifact with retained metrics
 
 ## Artifact policy

@@ -62,9 +62,25 @@
     },
     {
       "run_id": "pre_hidden_1_16_r16_run_02",
-      "status": "pending",
+      "status": "completed",
+      "method": "MSCAF-TransUNet",
+      "attention_mode": "pre_hidden",
+      "attention_scales": ["1/16"],
+      "attention_reduction": 16,
       "notebook": "notebooks/transunet-prehidden-1-16-rerun.ipynb",
-      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16"
+      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16",
+      "artifact_zip_colab": "/content/TransUNet-Medical-Image-Segmentation/artifacts/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16.zip",
+      "drive_export_dir": "/content/drive/MyDrive/transunet_colab_outputs",
+      "resumed_from_epoch": 145,
+      "overall": {
+        "mean_dice": 0.780560,
+        "mean_dice_percent": 78.0560,
+        "mean_hd95": 28.846281
+      },
+      "pancreas": {
+        "mean_dice": 0.564749,
+        "mean_hd95": 13.652530
+      }
     },
     {
       "run_id": "pre_hidden_1_16_r16_run_03",
@@ -74,7 +90,7 @@
     },
     {
       "run_id": "reverse_bottleneck_fusion_s0_r4_run_01",
-      "status": "planned",
+      "status": "completed",
       "method": "MSCAF-TransUNet + reverse bottleneck fusion",
       "attention_mode": "pre_hidden",
       "attention_scales": ["1/16"],
@@ -83,7 +99,19 @@
       "ra_scales": [0],
       "ra_reduction": 4,
       "notebook": "notebooks/transunet-reverse-bottleneck-fusion.ipynb",
-      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4"
+      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4",
+      "artifact_zip_colab": "/content/TransUNet-Medical-Image-Segmentation/artifacts/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4.zip",
+      "drive_export_dir": "/content/drive/MyDrive/transunet_colab_outputs",
+      "resumed_from_epoch": 148,
+      "overall": {
+        "mean_dice": 0.778149,
+        "mean_dice_percent": 77.8149,
+        "mean_hd95": 28.049328
+      },
+      "pancreas": {
+        "mean_dice": 0.571350,
+        "mean_hd95": 14.538932
+      }
     }
   ]
 }
