@@ -61,6 +61,12 @@ def get_r50_b16_config():
     config.n_skip = 3
     config.activation = 'softmax'
 
+    # Reverse Attention parameters
+    config.reverse_attention_mode = 'none'       # 'none', 'ra_skip', 'ra_bridge', or 'ra_fusion'
+    config.reverse_attention_scales = [0]         # skip/fusion indices for RA modes that use indices
+    config.reverse_attention_reduction = 4        # bottleneck reduction ratio
+    config.skip_indices = ()                     # optional decoder skip indices, e.g. (1, 2)
+
     return config
 
 

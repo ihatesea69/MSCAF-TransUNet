@@ -5,10 +5,16 @@ import random
 import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
-from experiment_utils import apply_attention_config, build_attention_suffix, parse_attention_scales
-from networks.vit_seg_modeling import VisionTransformer as ViT_seg
-from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
-from trainer import trainer_synapse
+from experiment_utils import (
+    apply_attention_config,
+    apply_reverse_attention_config,
+    build_attention_suffix,
+    build_reverse_attention_suffix,
+    build_skip_indices_suffix,
+    parse_attention_scales,
+    parse_reverse_attention_scales,
+    parse_skip_indices,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--root_path', type=str,
@@ -40,6 +46,9 @@ parser.add_argument('--max_train_samples', type=int,
                     default=0, help='limit training samples for smoke runs; 0 uses the full dataset')
 parser.add_argument('--n_skip', type=int,
                     default=3, help='using number of skip-connect, default is num')
+parser.add_argument('--skip_indices', type=str,
+                    default='',
+                    help='comma-separated skip indices to use, e.g. "1,2"')
 parser.add_argument('--vit_name', type=str,
                     default='R50-ViT-B_16', help='select one vit model')
 parser.add_argument('--vit_patches_size', type=int,
@@ -52,10 +61,21 @@ parser.add_argument('--attention_scales', type=str,
                     help='comma-separated CNN scales, e.g. 1/8,1/4,1/2')
 parser.add_argument('--attention_reduction', type=int,
                     default=16, help='channel reduction used by the CNN attention blocks')
+parser.add_argument('--ra_mode', type=str, default='none',
+                    choices=['none', 'ra_skip', 'ra_bridge', 'ra_fusion'],
+                    help='reverse attention mode for decoder bridge, skip, or post-fusion features')
+parser.add_argument('--ra_scales', type=str, default='0',
+                    help='comma-separated skip or fusion block indices for RA, e.g. "0" or "0,1,2"')
+parser.add_argument('--ra_reduction', type=int, default=4,
+                    help='bottleneck reduction ratio for reverse attention')
 args = parser.parse_args()
 
 
 if __name__ == "__main__":
+    from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
+    from networks.vit_seg_modeling import VisionTransformer as ViT_seg
+    from trainer import trainer_synapse
+
     if not args.deterministic:
         cudnn.benchmark = True
         cudnn.deterministic = False
@@ -83,6 +103,8 @@ if __name__ == "__main__":
     args.list_dir = dataset_config[dataset_name]['list_dir']
     args.is_pretrain = True
     args.attention_scales = parse_attention_scales(args.attention_mode, args.attention_scales)
+    args.ra_scales = parse_reverse_attention_scales(args.ra_mode, args.ra_scales)
+    args.skip_indices = parse_skip_indices(args.skip_indices)
     if args.attention_mode != 'none' and 'R50' not in args.vit_name:
         raise ValueError('CNN attention modes require a hybrid R50-ViT backbone.')
     args.exp = 'TU_' + dataset_name + str(args.img_size)
@@ -104,16 +126,32 @@ if __name__ == "__main__":
         args.attention_reduction,
     )
 
+    snapshot_path = snapshot_path + build_reverse_attention_suffix(
+        args.ra_mode,
+        args.ra_scales,
+        args.ra_reduction,
+    )
+
+    snapshot_path = snapshot_path + build_skip_indices_suffix(args.skip_indices)
+
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
     config_vit = CONFIGS_ViT_seg[args.vit_name]
     config_vit.n_classes = args.num_classes
     config_vit.n_skip = args.n_skip
+    if args.skip_indices:
+        config_vit.skip_indices = args.skip_indices
     apply_attention_config(
         config_vit,
         mode=args.attention_mode,
         scales=args.attention_scales,
         reduction=args.attention_reduction,
+    )
+    apply_reverse_attention_config(
+        config_vit,
+        mode=args.ra_mode,
+        scales=args.ra_scales,
+        reduction=args.ra_reduction,
     )
     if args.vit_name.find('R50') != -1:
         config_vit.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))

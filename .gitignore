@@ -17,15 +17,26 @@ env/
 .omx/
 
 # Data and model weights (too large for git)
-data/
-model/
-predictions/
-artifacts/
-results/
+/data/
+/model/
+/predictions/
+/results/
+/archive/
+/resume_checkpoints/
+*.pth
+*.pt
+*.ckpt
+*.nii
+*.nii.gz
+*.h5
+*.npz
 
 # Logs
 test_log/
 *.log
+
+# One-off maintenance scripts generated during cleanup/rebuild sessions
+scripts/maintenance/
 
 # IDE
 .vscode/

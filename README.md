@@ -10,17 +10,22 @@ This repo currently centers on **MSCAF-TransUNet** and its related ablations on 
 
 - `pre_hidden`: refine selected CNN scales and fuse them into the hidden feature before patch projection
 - `cnn_fusion`: refine selected CNN skip features and fuse multiple CNN scales back into the hidden feature
+- `ra_fusion`: apply reverse attention plus bottleneck immediately after the first decoder fusion at `1/8`
+- Historical ablation: `ra_skip` applies Reverse Attention to selected decoder skip connections
 
-## Current result snapshot
+## Result snapshot
 
-Latest evaluated **MSCAF-TransUNet** run:
+Tracked result records live in [docs/results/results_summary.md](docs/results/results_summary.md) and [docs/results/run_registry.json](docs/results/run_registry.json). Lightweight artifacts and paper outputs are versioned when they are small enough for Git; datasets, checkpoints, and prediction volumes stay outside the repository.
 
-- Method: `MSCAF-TransUNet`
-- Implementation mode: `cnn_fusion`
-- Scales: `1/8,1/4,1/2`
-- Mean Dice: `76.61%`
-- Mean HD95: `28.80`
-- Better than the original TransUNet paper on `HD95`, `Liver`, `Pancreas`, `Spleen`, and `Stomach`
+Accuracy cannot be reconstructed from Dice and HD95 alone. Use [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb) when retained NIfTI predictions still exist. If old artifacts were deleted but the latest checkpoints remain on Drive, use [notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb](notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb) to rerun inference without retraining.
+
+Current completed runs:
+
+- `mscaf_cnn_fusion_3scale`: `cnn_fusion` on `1/8,1/4,1/2`, Mean Dice `76.61%`, Mean HD95 `28.80`
+- `pre_hidden_1_16_r16_run_01`: `pre_hidden` on `1/16`, Mean Dice `78.3119%`, Mean HD95 `29.879884`, Pancreas Dice `0.549484`
+- `pre_hidden_1_16_r16_run_02`: `pre_hidden` on `1/16`, Mean Dice `78.0560%`, Mean HD95 `28.846281`, Pancreas Dice `0.564749`
+- `reverse_attention_s0_r4_run_01`: `pre_hidden` on `1/16` with RA skip `0`, reduction `4`, Mean Dice `78.1807%`, Mean HD95 `31.889628`, Pancreas Dice `0.553947`
+- `reverse_bottleneck_fusion_s0_r4_run_01`: `pre_hidden` on `1/16` with post-fusion RA block `0`, reduction `4`, Mean Dice `77.8149%`, Mean HD95 `28.049328`, Pancreas Dice `0.571350`
 
 Reference baseline from the earlier cleaned reproduction:
 
@@ -51,6 +56,9 @@ datasets/          dataset package and Synapse loader
 splits/            explicit train/test split metadata
 networks/          TransUNet model + hybrid encoder attention modules
 notebooks/         Colab notebooks for Drive bootstrap and end-to-end experiments
+docs/results/      lightweight result registry and artifact manifest
+artifacts/         lightweight local notebook backups and small retained research artifacts
+output/            lightweight paper/report outputs such as LaTeX source and PDFs
 train.py           training entrypoint
 test.py            evaluation entrypoint
 trainer.py         training loop with epoch-level resume checkpointing
@@ -118,7 +126,20 @@ python train.py ^
   --dataset Synapse ^
   --vit_name R50-ViT-B_16 ^
   --attention_mode pre_hidden ^
-  --attention_scales 1/8
+  --attention_scales 1/16
+```
+
+Advisor-requested reverse bottleneck fusion experiment:
+
+```bash
+python train.py ^
+  --dataset Synapse ^
+  --vit_name R50-ViT-B_16 ^
+  --attention_mode pre_hidden ^
+  --attention_scales 1/16 ^
+  --ra_mode ra_fusion ^
+  --ra_scales 0 ^
+  --ra_reduction 4
 ```
 
 Baseline ablation:
@@ -143,18 +164,31 @@ Save NIfTI predictions:
 python test.py --dataset Synapse --vit_name R50-ViT-B_16 --is_savenii
 ```
 
+Evaluation logs include `voxel_accuracy`, `foreground_voxel_accuracy`, `mean_foreground_accuracy`, and `pancreas_accuracy`. Use the foreground metrics for research comparisons because whole-volume voxel accuracy can be dominated by background.
+
 ## Colab notebooks
 
 For reproducibility on Google Colab:
 
 - [notebooks/transunet-drive-data-setup.ipynb](notebooks/transunet-drive-data-setup.ipynb): prepare the Synapse dataset and pretrained TransUNet weight on Google Drive
-- [notebooks/transunet-cnn-attention-research-colab.ipynb](notebooks/transunet-cnn-attention-research-colab.ipynb): run the MSCAF-TransUNet experiment end-to-end on Colab with live logs and checkpoint resume
+- [notebooks/transunet-cnn-attention-research-colab.ipynb](notebooks/transunet-cnn-attention-research-colab.ipynb): run the primary MSCAF-TransUNet `cnn_fusion` experiment end-to-end
+- [notebooks/transunet-prehidden-1-16-rerun.ipynb](notebooks/transunet-prehidden-1-16-rerun.ipynb): completed non-RA `pre_hidden` run `02`; reuse only for the remaining fresh run `03`
+- [notebooks/transunet-reverse-bottleneck-fusion.ipynb](notebooks/transunet-reverse-bottleneck-fusion.ipynb): completed advisor-requested reverse attention + bottleneck fusion at the first `1/8` decoder merge
+- [notebooks/transunet-mscaf-reverse-attention.ipynb](notebooks/transunet-mscaf-reverse-attention.ipynb): historical completed Reverse Attention `s0/r4` artifact with retained metrics
+- [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb): calculate accuracy for every retained prediction artifact without retraining; reports missing or ambiguous zips explicitly
+- [notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb](notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb): rerun inference for the two latest retained checkpoints and export measured accuracy when prediction artifacts have already been deleted
+
+## Artifact policy
+
+- Commit source code, split metadata, notebooks, lightweight result registries, small notebook backups, and small paper/report outputs.
+- Keep datasets, model checkpoints, prediction volumes, large generated exports, and runtime caches outside Git.
+- Reference large retained outputs from README or `docs/results/` using Drive, Colab, or GitHub Release paths.
 
 ## Notes
 
 - `trainer.py` saves `latest_checkpoint.pth` every epoch and can resume automatically.
 - Package markers were added to `datasets/` and `networks/` so Colab does not confuse them with third-party packages.
-- The repo intentionally no longer contains AWS deployment code, CloudFormation templates, or SageMaker helpers.
+- The repo intentionally no longer contains AWS deployment code, CloudFormation templates, SageMaker helpers, local archives, or generated binary reports.
 
 ## Citation
 

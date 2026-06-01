@@ -62,7 +62,13 @@ def trainer_synapse(args, model, snapshot_path):
     checkpoint_file = os.path.join(checkpoint_dir, 'latest_checkpoint.pth')
     if os.path.exists(checkpoint_file):
         checkpoint = torch.load(checkpoint_file, weights_only=False)
-        model.load_state_dict(checkpoint['model_state'])
+        load_result = model.load_state_dict(checkpoint['model_state'], strict=False)
+        if load_result.missing_keys:
+            logging.info(f"Missing keys when loading checkpoint (likely new modules, will use default init): {len(load_result.missing_keys)} keys")
+            for k in load_result.missing_keys[:5]:
+                logging.info(f"  - {k}")
+        if load_result.unexpected_keys:
+            logging.info(f"Unexpected keys in checkpoint (will be ignored): {len(load_result.unexpected_keys)} keys")
         optimizer.load_state_dict(checkpoint['optimizer_state'])
         start_epoch = checkpoint['epoch'] + 1
         iter_num = checkpoint['iter_num']

@@ -1,0 +1,117 @@
+{
+  "results": [
+    {
+      "run_id": "baseline_reproduction",
+      "status": "completed",
+      "method": "TransUNet reproduction",
+      "mean_dice_percent": 77.29,
+      "mean_hd95": 30.71
+    },
+    {
+      "run_id": "mscaf_cnn_fusion_3scale",
+      "status": "completed",
+      "method": "MSCAF-TransUNet",
+      "attention_mode": "cnn_fusion",
+      "attention_scales": ["1/8", "1/4", "1/2"],
+      "mean_dice_percent": 76.61,
+      "mean_hd95": 28.8,
+      "pancreas_dice_percent": 57.36
+    },
+    {
+      "run_id": "pre_hidden_1_16_r16_run_01",
+      "status": "completed",
+      "method": "MSCAF-TransUNet",
+      "attention_mode": "pre_hidden",
+      "attention_scales": ["1/16"],
+      "attention_reduction": 16,
+      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16",
+      "artifact_zip_colab": "/content/TransUNet-Medical-Image-Segmentation/artifacts/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16.zip",
+      "drive_export_dir": "/content/drive/MyDrive/transunet_colab_outputs",
+      "overall": {
+        "mean_dice": 0.783119,
+        "mean_dice_percent": 78.3119,
+        "mean_hd95": 29.879884
+      },
+      "pancreas": {
+        "mean_dice": 0.549484,
+        "mean_hd95": 13.912953
+      }
+    },
+    {
+      "run_id": "reverse_attention_s0_r4_run_01",
+      "status": "completed",
+      "method": "MSCAF-TransUNet + Reverse Attention",
+      "attention_mode": "pre_hidden",
+      "attention_scales": ["1/16"],
+      "attention_reduction": 16,
+      "ra_mode": "ra_skip",
+      "ra_scales": [0],
+      "ra_reduction": 4,
+      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_skip-s0-r4",
+      "artifact_zip_colab": "/content/TransUNet-Medical-Image-Segmentation/artifacts/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_skip-s0-r4/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_skip-s0-r4.zip",
+      "drive_export_dir": "/content/drive/MyDrive/transunet_colab_outputs",
+      "overall": {
+        "mean_dice": 0.781807,
+        "mean_dice_percent": 78.1807,
+        "mean_hd95": 31.889628
+      },
+      "pancreas": {
+        "mean_dice": 0.553947,
+        "mean_hd95": 19.290868
+      }
+    },
+    {
+      "run_id": "pre_hidden_1_16_r16_run_02",
+      "status": "completed",
+      "method": "MSCAF-TransUNet",
+      "attention_mode": "pre_hidden",
+      "attention_scales": ["1/16"],
+      "attention_reduction": 16,
+      "notebook": "notebooks/transunet-prehidden-1-16-rerun.ipynb",
+      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16",
+      "artifact_zip_colab": "/content/TransUNet-Medical-Image-Segmentation/artifacts/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16.zip",
+      "drive_export_dir": "/content/drive/MyDrive/transunet_colab_outputs",
+      "resumed_from_epoch": 145,
+      "overall": {
+        "mean_dice": 0.780560,
+        "mean_dice_percent": 78.0560,
+        "mean_hd95": 28.846281
+      },
+      "pancreas": {
+        "mean_dice": 0.564749,
+        "mean_hd95": 13.652530
+      }
+    },
+    {
+      "run_id": "pre_hidden_1_16_r16_run_03",
+      "status": "pending",
+      "notebook": "notebooks/transunet-prehidden-1-16-rerun.ipynb",
+      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16"
+    },
+    {
+      "run_id": "reverse_bottleneck_fusion_s0_r4_run_01",
+      "status": "completed",
+      "method": "MSCAF-TransUNet + reverse bottleneck fusion",
+      "attention_mode": "pre_hidden",
+      "attention_scales": ["1/16"],
+      "attention_reduction": 16,
+      "ra_mode": "ra_fusion",
+      "ra_scales": [0],
+      "ra_reduction": 4,
+      "notebook": "notebooks/transunet-reverse-bottleneck-fusion.ipynb",
+      "snapshot_name": "TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4",
+      "artifact_zip_colab": "/content/TransUNet-Medical-Image-Segmentation/artifacts/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4/TU_pretrain_R50-ViT-B_16_skip3_epo150_bs24_224_attn-pre_hidden-1_16-r16_ra-ra_fusion-s0-r4.zip",
+      "drive_export_dir": "/content/drive/MyDrive/transunet_colab_outputs",
+      "resumed_from_epoch": 148,
+      "overall": {
+        "mean_dice": 0.778149,
+        "mean_dice_percent": 77.8149,
+        "mean_hd95": 28.049328
+      },
+      "pancreas": {
+        "mean_dice": 0.571350,
+        "mean_hd95": 14.538932
+      }
+    }
+  ]
+}
