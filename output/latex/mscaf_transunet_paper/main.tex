@@ -1,0 +1,379 @@
+\documentclass[10pt,a4paper]{article}
+
+\usepackage[a4paper,top=2cm,bottom=2cm,left=2.2cm,right=2.2cm]{geometry}
+\usepackage{fontspec}
+\IfFontExistsTF{Times New Roman}{\setmainfont{Times New Roman}}{\setmainfont{TeX Gyre Termes}}
+\usepackage[vietnamese]{babel}
+\addto\captionsvietnamese{\renewcommand{\abstractname}{Tóm tắt}}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{url}
+\usepackage[unicode,hidelinks]{hyperref}
+\usepackage{enumitem}
+\usepackage{multirow}
+
+\captionsetup{font=small,labelfont=bf}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{1em}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}{>{\centering\arraybackslash}X}
+
+\begin{document}
+\begin{center}
+{\LARGE\bfseries Cải tiến TransUNet kết hợp cơ chế Attention đa tầng cho phân đoạn ảnh tuyến tụy trên CT bụng\par}
+\end{center}
+\vspace{0.8em}
+
+\begin{abstract}
+Phân đoạn ảnh y khoa đóng vai trò thiết yếu trong việc phát triển các hệ thống chăm sóc sức khỏe, đặc biệt phục vụ chẩn đoán bệnh và lập kế hoạch điều trị. Trong số các bài toán phân đoạn, tuyến tụy được xem là một trong những cơ quan khó nhất do kích thước nhỏ, hình dạng không cố định giữa các bệnh nhân và độ tương phản thấp với các mô xung quanh trên ảnh CT bụng. Kiến trúc dạng chữ U (U-Net) từ lâu đã trở thành lựa chọn phổ biến và đạt được nhiều kết quả tốt trong phân đoạn ảnh y khoa; tuy nhiên, do đặc tính cục bộ vốn có của phép tích chập, U-Net gặp hạn chế trong việc nắm bắt các mối quan hệ phụ thuộc xa trong ảnh. Transformer, với cơ chế self-attention toàn cục, có khả năng mô hình hóa ngữ cảnh rộng nhưng lại thiếu thông tin chi tiết ở mức thấp cần thiết cho việc định vị chính xác. TransUNet kết hợp ưu điểm của cả hai hướng tiếp cận này bằng cách dùng Transformer để mã hóa chuỗi token từ feature map của CNN, đồng thời sử dụng decoder dạng chữ U để khôi phục thông tin không gian chi tiết.
+
+Nghiên cứu này đề xuất một cải tiến trên nền tảng TransUNet nhắm đến bài toán phân đoạn tuyến tụy, với hai thành phần chính: (1) tích hợp module MSCAF (Multi-Scale Channel-Spatial Attention Fusion) tại lớp đặc trưng ẩn của CNN trước bước patch embedding, nhằm tinh chỉnh biểu diễn đặc trưng trước khi đưa vào Transformer; và (2) bổ sung module Reverse Attention kết hợp BottleNeck ngay sau phép gộp đầu tiên giữa decoder và skip feature ở tỷ lệ $1/8$. Vị trí hậu gộp này cho phép module xử lý đồng thời ngữ cảnh sâu từ Transformer và chi tiết cục bộ từ CNN trước khi decoder phục hồi đặc trưng về các tỷ lệ $1/4$ và $1/2$. Phương pháp được đánh giá trên bộ dữ liệu Synapse multi-organ với trọng tâm phân tích riêng cho lớp tuyến tụy, sử dụng hai độ đo Dice Similarity Coefficient (DSC) và Hausdorff Distance 95th percentile (HD95). Kết quả của biến thể hậu gộp đạt Mean DSC $77.81\%$, Mean HD95 $28.05$ mm và Pancreas DSC $57.14\%$.
+\end{abstract}
+
+\section{Giới thiệu}
+
+Phân đoạn ảnh y khoa là bước tiền đề quan trọng trong phát triển các hệ thống hỗ trợ y tế, đặc biệt cho chẩn đoán bệnh và lập kế hoạch điều trị. Trong số các cơ quan nội tạng, tuyến tụy là một trong những đối tượng khó phân đoạn nhất trên ảnh CT bụng do kích thước nhỏ (thường chỉ chiếm một phần nhỏ trong thể tích ảnh), hình dạng và vị trí biến thiên lớn giữa các bệnh nhân, đồng thời có biên mờ do tương phản thấp với các mô xung quanh \cite{yu2018rstn,moglia2025pancreasreview}. Vì vậy, mô hình phân đoạn cần đồng thời nắm bắt ngữ cảnh giải phẫu ở phạm vi rộng và giữ được chi tiết định vị ở vùng biên.
+
+Trong nhiều bài toán phân đoạn ảnh y khoa, kiến trúc dạng chữ U (U-Net) \cite{ronneberger2015unet} đã trở thành chuẩn mực nhờ cấu trúc encoder-decoder đối xứng kết hợp skip connections. Skip connections cho phép truyền thông tin không gian ở độ phân giải cao từ encoder sang decoder, hỗ trợ khôi phục biên và các cấu trúc nhỏ. Tuy nhiên, do bản chất cục bộ vốn có của phép tích chập, U-Net gặp hạn chế trong việc mô hình hóa tường minh các mối quan hệ phụ thuộc xa (long-range dependency) trong ảnh. Đối với tuyến tụy, điều này đặc biệt bất lợi vì việc nhận diện cơ quan này thường cần tham chiếu đến bối cảnh giải phẫu rộng hơn.
+
+Transformer \cite{vaswani2017attention}, được thiết kế ban đầu cho bài toán chuỗi, đã nổi lên như một kiến trúc thay thế với cơ chế self-attention toàn cục cho phép mô hình học quan hệ giữa mọi cặp phần tử trong chuỗi đầu vào. Vision Transformer (ViT) \cite{dosovitskiy2021vit} cho thấy việc biểu diễn ảnh dưới dạng chuỗi patch có thể đem lại khả năng mô hình hóa ngữ cảnh mạnh mẽ. Tuy nhiên, Transformer thuần túy có thể dẫn đến khả năng định vị hạn chế do thiếu thông tin chi tiết ở mức thấp.
+
+TransUNet \cite{chen2021transunet} kết hợp ưu điểm của cả Transformer và U-Net, tạo thành một giải pháp mạnh cho phân đoạn ảnh y khoa. Một mặt, Transformer mã hóa chuỗi token được tạo từ feature map của CNN để trích xuất ngữ cảnh toàn cục. Mặt khác, decoder thực hiện upsampling các đặc trưng đã mã hóa và kết hợp với feature map độ phân giải cao từ CNN để cho phép định vị chính xác. TransUNet đã đạt kết quả vượt trội so với nhiều phương pháp cạnh tranh trên các ứng dụng y khoa khác nhau bao gồm phân đoạn đa cơ quan và phân đoạn tim.
+
+Tuy nhiên, trong TransUNet gốc \cite{chen2021transunet}, feature map từ CNN được đưa trực tiếp vào patch embedding mà không qua bất kỳ bước tinh chỉnh nào. Nhận thấy rằng việc tăng cường chất lượng biểu diễn tại điểm chuyển tiếp giữa CNN và Transformer có thể giúp Transformer nhận được chuỗi token mang thông tin phong phú hơn. Ở phía decoder, phép gộp đầu tiên tại tỷ lệ $1/8$ cũng là vị trí phù hợp để bổ sung cơ chế tinh chỉnh biên vì tensor tại đây đã chứa cả ngữ cảnh sâu từ Transformer và đặc trưng cục bộ từ CNN.
+
+Đóng góp chính của nghiên cứu bao gồm:
+\begin{itemize}[nosep,leftmargin=1.5em]
+    \item Đề xuất module MSCAF (Multi-Scale Channel-Spatial Attention Fusion) tích hợp tại hidden CNN feature tỷ lệ $1/16$ trước patch embedding, kết hợp channel attention và spatial attention theo cơ chế residual connection \cite{he2016resnet} để tinh chỉnh đặc trưng trước khi token hóa.
+    \item Đề xuất module Reverse Attention kết hợp BottleNeck \cite{li2024rtaformer} ngay sau phép gộp đầu tiên giữa decoder và skip feature tỷ lệ $1/8$, sử dụng attention map đảo ngược để tinh chỉnh tensor hợp nhất trước khi decoder phục hồi về tỷ lệ $1/4$ và $1/2$.
+    \item Đánh giá thực nghiệm trên bộ dữ liệu Synapse multi-organ với trọng tâm phân tích riêng cho lớp tuyến tụy, bao gồm so sánh với các phương pháp hiện có và phân tích ablation chi tiết.
+\end{itemize}
+
+\section{Công trình liên quan}
+
+\subsection{CNN và kiến trúc dạng chữ U}
+
+U-Net \cite{ronneberger2015unet} đề xuất kiến trúc encoder-decoder đối xứng với skip connections, trong đó nhánh mã hóa (contracting path) học đặc trưng phân cấp thông qua các khối convolution và max-pooling, còn nhánh giải mã (expanding path) phục hồi mặt nạ phân đoạn ở độ phân giải đầy đủ bằng up-convolution kết hợp feature từ nhánh mã hóa. Đối với tuyến tụy, skip connections đặc biệt quan trọng vì cơ quan này nhỏ, có biên không rõ và dễ bị ảnh hưởng bởi nền giải phẫu phức tạp \cite{yu2018rstn,moglia2025pancreasreview}. Attention U-Net \cite{oktay2018attentionunet} mở rộng U-Net bằng cách thêm attention gates vào skip connections, cho phép mô hình học cách tập trung vào vùng cơ quan mục tiêu và giảm ảnh hưởng của các vùng nền không liên quan --- paper này được thiết kế với mục tiêu cụ thể là phân đoạn tuyến tụy.
+
+\subsection{Transformer trong phân đoạn ảnh y khoa}
+
+Transformer \cite{vaswani2017attention} mô hình hóa quan hệ giữa các phần tử của chuỗi bằng cơ chế multi-head self-attention (MSA), cho phép mỗi phần tử ``nhìn thấy'' toàn bộ chuỗi đầu vào. Vision Transformer (ViT) \cite{dosovitskiy2021vit} áp dụng Transformer trực tiếp lên chuỗi patch ảnh, cho thấy khả năng mô hình hóa ngữ cảnh toàn cục vượt trội khi có đủ dữ liệu huấn luyện. TransUNet \cite{chen2021transunet} kết hợp CNN và Transformer trong một kiến trúc hybrid: CNN (ResNet-50) trích xuất feature map ở tỷ lệ $1/16$, feature map này được token hóa qua patch embedding và đưa vào Transformer encoder gồm 12 lớp MSA+MLP. Decoder dạng chữ U (Cascaded Upsampler --- CUP) kết hợp output của Transformer với các feature map ở tỷ lệ cao hơn ($1/8$, $1/4$) từ CNN thông qua skip connections để khôi phục chi tiết không gian. TransUNet cho thấy rằng Transformer có thể đóng vai trò encoder mạnh cho phân đoạn ảnh y khoa, với sự kết hợp của U-Net để tăng cường chi tiết thông qua khôi phục thông tin không gian cục bộ.
+
+\subsection{Cơ chế attention trong CNN}
+
+Squeeze-and-Excitation Network (SE-Net) \cite{hu2018senet} đề xuất cơ chế channel attention bằng cách ``squeeze'' thông tin toàn cục qua global average pooling và ``excitation'' để học trọng số cho từng kênh. CBAM \cite{woo2018cbam} mở rộng ý tưởng này bằng cách kết hợp cả channel attention và spatial attention theo thứ tự tuần tự: channel attention xác định ``kênh nào quan trọng'' còn spatial attention xác định ``vùng nào quan trọng''. Cả hai module đều nhẹ, có thể tích hợp vào bất kỳ kiến trúc CNN nào với chi phí tính toán không đáng kể. Trong nghiên cứu này, thiết kế attention của module MSCAF được lấy cảm hứng từ CBAM nhưng được đặt tại vị trí đặc biệt --- điểm chuyển tiếp giữa CNN và Transformer --- thay vì trong các khối convolution thông thường.
+
+\subsection{Reverse Attention cho phân đoạn biên}
+
+Reverse Attention là kỹ thuật đảo ngược attention map để buộc mô hình tập trung vào vùng mà nó đang ``bỏ qua'' --- thường là vùng biên khó. RTA-Former \cite{li2024rtaformer} đề xuất cơ chế Reverse Transformer Attention cho bài toán polyp segmentation, trong đó attention map từ tầng sâu hơn được đảo ngược ($1 - \text{attention}$) và áp dụng lên feature ở tầng nông hơn, buộc mô hình khai thác thông tin tại vùng biên thay vì chỉ tập trung vào vùng foreground dễ nhận diện. Polyp segmentation có nhiều đặc điểm tương đồng với phân đoạn tuyến tụy: cả hai đều là cơ quan/tổn thương nhỏ với biên mờ, tương phản thấp, và nằm trong vùng mô mềm đồng nhất. Trong nghiên cứu này, ý tưởng Reverse Attention được adapt cho kiến trúc TransUNet bằng cách áp dụng lên tensor hậu gộp đầu tiên của decoder. Thiết kế này bổ sung khả năng tinh chỉnh biên ở phía decoder song song với MSCAF ở phía encoder.
+
+\section{Phương pháp}
+
+\subsection{Tổng quan kiến trúc}
+
+Phương pháp được xây dựng trên nền tảng TransUNet \cite{chen2021transunet} với hai cải tiến chính: (1) module MSCAF được tích hợp tại điểm chuyển tiếp giữa CNN encoder và Transformer encoder; và (2) module Reverse Attention kết hợp BottleNeck được đặt ngay sau phép gộp đầu tiên ở decoder. Kiến trúc tổng thể bao gồm CNN feature extractor (ResNet-50), module MSCAF, Transformer encoder (ViT-B/16), Cascaded Upsampler decoder và block tinh chỉnh hậu gộp. Hình~\ref{fig:architecture} được hiển thị khi asset kiến trúc đi kèm báo cáo được cung cấp.
+
+\IfFileExists{figures/mscaf-transunet-pancreas-architecture.png}{
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/mscaf-transunet-pancreas-architecture.png}
+\caption{Tổng quan kiến trúc MSCAF-TransUNet cho phân đoạn tuyến tụy. Module MSCAF được đặt tại hidden CNN feature tỷ lệ $1/16$ trước patch embedding. Block Reverse Attention kết hợp BottleNeck xử lý tensor ngay sau phép gộp decoder đầu tiên ở tỷ lệ $1/8$, trước khi decoder phục hồi đặc trưng về tỷ lệ $1/4$ và $1/2$.}
+\label{fig:architecture}
+\end{figure}
+}{
+\refstepcounter{figure}\label{fig:architecture}
+}
+
+\subsection{Phát biểu bài toán}
+
+Với ảnh CT đầu vào $x \in \mathbb{R}^{H \times W \times C}$, mục tiêu là dự đoán mặt nạ phân đoạn $y \in \{0,1,\ldots,K\}^{H \times W}$ với $K$ lớp cơ quan. Mặc dù thiết lập huấn luyện sử dụng bộ dữ liệu có nhiều nhãn cơ quan ($K=8$ cho Synapse), phạm vi đánh giá trong bài viết tập trung vào lớp tuyến tụy. Hai tiêu chí đánh giá chính là Dice Similarity Coefficient (DSC) và Hausdorff Distance 95th percentile (HD95).
+
+\subsection{CNN-Transformer Hybrid Encoder}
+
+Theo thiết kế của TransUNet \cite{chen2021transunet}, CNN được dùng trước để trích xuất feature map phân cấp từ ảnh CT. Cụ thể, ResNet-50 \cite{he2016resnet} tạo ra các feature map ở bốn tỷ lệ không gian: $f_{1/2} \in \mathbb{R}^{64 \times \frac{H}{2} \times \frac{W}{2}}$, $f_{1/4} \in \mathbb{R}^{256 \times \frac{H}{4} \times \frac{W}{4}}$, $f_{1/8} \in \mathbb{R}^{512 \times \frac{H}{8} \times \frac{W}{8}}$, và $f_{1/16} \in \mathbb{R}^{1024 \times \frac{H}{16} \times \frac{W}{16}}$. Feature $f_{1/16}$ là hidden feature sâu nhất, mang thông tin ngữ nghĩa cao nhất nhưng có độ phân giải không gian thấp nhất.
+
+Thay vì token hóa trực tiếp ảnh đầu vào như ViT thuần túy, patch embedding được áp dụng trên $f_{1/16}$ sau khi đã qua module MSCAF. Với chuỗi patch đã được vector hóa $\{x_p^i\}_{i=1}^{N}$ từ feature map, embedding đầu vào của Transformer được tính \cite{dosovitskiy2021vit,chen2021transunet}:
+\begin{equation}
+    z_0 = [x_p^1 E;\; x_p^2 E;\; \ldots;\; x_p^N E] + E_{pos},
+    \label{eq:patch-embedding}
+\end{equation}
+trong đó $E \in \mathbb{R}^{(P^2 \cdot C) \times D}$ là ma trận chiếu tuyến tính học được, $E_{pos} \in \mathbb{R}^{N \times D}$ là positional embedding, $P$ là kích thước patch, $D=768$ là chiều embedding, và $N = \frac{H}{16P} \times \frac{W}{16P}$ là tổng số patch. Trong cấu hình R50-ViT-B/16 với ảnh đầu vào $224 \times 224$, grid size là $1 \times 1$ nên $N = 196$ patch (mỗi patch tương ứng $1 \times 1$ pixel trên feature map $14 \times 14$).
+
+Transformer encoder gồm $L=12$ lớp, mỗi lớp bao gồm Multi-head Self-Attention (MSA) và Multi-Layer Perceptron (MLP) với residual connections \cite{vaswani2017attention,dosovitskiy2021vit}:
+\begin{align}
+    z'_\ell &= \text{MSA}(\text{LN}(z_{\ell-1})) + z_{\ell-1}, \label{eq:msa}\\
+    z_\ell &= \text{MLP}(\text{LN}(z'_\ell)) + z'_\ell, \label{eq:mlp}
+\end{align}
+trong đó $\text{LN}(\cdot)$ là layer normalization. MSA sử dụng 12 heads với chiều mỗi head là $D/12 = 64$. Output $z_L$ của Transformer encoder mang thông tin ngữ cảnh toàn cục giữa tất cả các patch trong ảnh --- điều này đặc biệt có ý nghĩa cho tuyến tụy vì mô hình có thể khai thác bối cảnh giải phẫu rộng hơn để nhận diện cơ quan nhỏ này.
+
+\subsection{Module MSCAF: Multi-Scale Channel-Spatial Attention Fusion}
+
+Điểm cải tiến chính của phương pháp đề xuất là module MSCAF, được đặt tại hidden CNN feature $f_{1/16}$ \textbf{trước} bước patch embedding. Mục tiêu của module này là tinh chỉnh biểu diễn đặc trưng theo cả chiều kênh (channel) và chiều không gian (spatial) trước khi feature được token hóa cho Transformer. Thiết kế attention theo kênh và không gian được lấy cảm hứng từ CBAM \cite{woo2018cbam}, nhưng được đặt tại vị trí chiến lược --- điểm chuyển tiếp CNN-Transformer --- thay vì bên trong các khối convolution.
+
+\subsubsection{Channel Attention}
+
+Channel attention học trọng số quan trọng cho từng kênh feature bằng cách khai thác thống kê toàn cục \cite{woo2018cbam}. Với feature map đầu vào $F \in \mathbb{R}^{C \times H \times W}$, channel attention được tính:
+\begin{equation}
+    M_c(F) = \sigma\left(\text{MLP}(\text{AvgPool}(F)) + \text{MLP}(\text{MaxPool}(F))\right),
+    \label{eq:channel-attention}
+\end{equation}
+trong đó $\text{AvgPool}$ và $\text{MaxPool}$ là adaptive global pooling (nén $H \times W$ về $1 \times 1$), MLP là mạng hai lớp fully-connected dùng chung trọng số với reduction ratio $r$ (bottleneck: $C \rightarrow C/r \rightarrow C$), và $\sigma$ là hàm sigmoid. Việc dùng cả average pooling và max pooling giúp nắm bắt cả thông tin trung bình và thông tin nổi bật nhất của từng kênh. Reduction ratio $r=16$ được sử dụng trong thực nghiệm.
+
+\subsubsection{Spatial Attention}
+
+Spatial attention học vùng không gian quan trọng bằng cách tổng hợp thông tin theo chiều kênh \cite{woo2018cbam}:
+\begin{equation}
+    M_s(F) = \sigma\left(\text{Conv}_{7\times7}\left([\text{AvgPool}_c(F);\; \text{MaxPool}_c(F)]\right)\right),
+    \label{eq:spatial-attention}
+\end{equation}
+trong đó $\text{AvgPool}_c$ và $\text{MaxPool}_c$ là pooling theo chiều kênh (tạo ra feature map $1 \times H \times W$), hai feature map được concatenate thành tensor $2 \times H \times W$ và đưa qua convolution $7\times7$ (với padding $= 3$ để giữ nguyên kích thước) để tạo spatial attention map $1 \times H \times W$. Kernel size $7\times7$ cho phép spatial attention xem xét vùng lân cận đủ rộng khi quyết định vùng nào quan trọng.
+
+\subsubsection{Residual Attention Fusion}
+
+Channel attention và spatial attention được áp dụng tuần tự theo cơ chế residual connection \cite{he2016resnet}:
+\begin{equation}
+    F' = F \odot M_c(F), \quad F'' = F' \odot M_s(F'),
+    \label{eq:sequential-attention}
+\end{equation}
+\begin{equation}
+    \hat{F} = F + F'',
+    \label{eq:residual-attention}
+\end{equation}
+trong đó $\odot$ là phép nhân element-wise (broadcast theo chiều phù hợp). Channel attention được áp dụng trước để chọn lọc kênh quan trọng, sau đó spatial attention tinh chỉnh vùng không gian trên feature đã được lọc kênh. Residual connection ($F + F''$) đảm bảo gradient ổn định trong quá trình huấn luyện và cho phép module học phần ``bổ sung'' thay vì thay thế hoàn toàn feature gốc --- nếu attention không hữu ích, mạng có thể học $F'' \approx 0$ và giữ nguyên feature ban đầu.
+
+\subsubsection{Feature Fusion Bridge}
+
+Sau khi attention refinement, feature được chiếu về không gian phù hợp với hidden feature thông qua Feature Fusion Bridge:
+\begin{equation}
+    h' = h + \alpha \cdot \text{Bridge}(\hat{F}_{1/16}),
+    \label{eq:fusion-bridge}
+\end{equation}
+trong đó $h$ là hidden feature gốc từ CNN (output cuối cùng của ResNet-50, $1024$ kênh), $\text{Bridge}(\cdot)$ bao gồm convolution $1\times1$, batch normalization và ReLU để căn chỉnh số kênh từ $C$ về $1024$, $\alpha$ là trọng số fusion học được (learnable scalar, khởi tạo $= 1.0$). Feature $h'$ sau đó được đưa vào patch embedding (Eq.~\ref{eq:patch-embedding}).
+
+\subsection{Cascaded Upsampler (Decoder) với Reverse Attention}
+
+Sau khi Transformer encoder tạo ra biểu diễn token $z_L \in \mathbb{R}^{N \times D}$, chuỗi token được reshape về dạng feature map 2D có kích thước $\frac{H}{16} \times \frac{W}{16} \times D$ và đưa qua decoder dạng chữ U \cite{chen2021transunet}. Decoder (Cascaded Upsampler --- CUP) thực hiện upsampling dần qua nhiều tầng với cấu hình kênh $[256, 128, 64, 16]$. Mỗi tầng tăng gấp đôi độ phân giải bằng bilinear upsampling, sau đó concatenate với skip feature tương ứng từ CNN encoder và đưa qua khối Conv-BN-ReLU.
+
+\subsubsection{Reverse Attention hậu gộp ở tỷ lệ $1/8$}
+
+Trong TransUNet gốc, tensor decoder sau khi upsampling được concatenate với skip feature rồi truyền thẳng qua khối convolution. Tuy nhiên, với tuyến tụy --- cơ quan có biên mờ và tương phản thấp --- mô hình thường ``bỏ qua'' vùng biên khó và tập trung vào vùng foreground dễ nhận diện. Lấy cảm hứng từ RTA-Former \cite{li2024rtaformer}, nghiên cứu này đặt Reverse Attention (RA) kết hợp BottleNeck ngay sau phép concatenate đầu tiên ở decoder. Đây là vị trí vừa gộp ngữ cảnh sâu từ Transformer với skip feature tỷ lệ $1/8$ từ CNN, trước khi decoder trả đặc trưng về tỷ lệ $1/4$ và $1/2$.
+
+Gọi $d_0$ là feature decoder ở tỷ lệ $1/16$ sau reshape và convolution, $s_{1/8}$ là skip feature CNN tương ứng. Tensor hậu gộp đầu tiên được tính:
+\begin{equation}
+    m_0 = \text{Up}(d_0) \oplus s_{1/8}.
+    \label{eq:first-decoder-merge}
+\end{equation}
+Module Reverse Attention tính attention map đảo ngược trực tiếp từ $m_0$:
+\begin{align}
+    A_{\text{reverse}}(m_0) &= 1 - \sigma\left(\text{BN}\left(\text{DWConv}_{3\times3}(m_0)\right)\right), \label{eq:reverse-map}\\
+    \widetilde{m}_0 &= \text{BottleNeck}\left(m_0 \odot A_{\text{reverse}}(m_0)\right) + m_0, \label{eq:ra-residual}\\
+    d_1 &= \text{ConvBlock}\left(\widetilde{m}_0\right). \label{eq:decoder-ra}
+\end{align}
+trong đó $\text{DWConv}_{3\times3}$ là depthwise convolution $3\times3$ (groups $= C$, giữ số tham số tối thiểu), $\sigma$ là hàm sigmoid, $\text{BN}$ là batch normalization, và $\text{BottleNeck}$ là khối $1\times1 \rightarrow 3\times3 \rightarrow 1\times1$ với reduction ratio $r=4$. Residual connection trong Eq.~\ref{eq:ra-residual} cho phép module học phần bổ sung mà không phá hủy tensor hợp nhất ban đầu.
+
+Hai bước phục hồi tiếp theo giữ nguyên cơ chế decoder:
+\begin{equation}
+    d_i = \text{ConvBlock}\left(\text{Up}(d_{i-1}) \oplus s_i\right), \quad i = 2, 3,
+    \label{eq:decoder-follow-up}
+\end{equation}
+trong đó $\text{Up}(\cdot)$ là bilinear upsampling $\times 2$, $\oplus$ là concatenation theo chiều kênh, và $\text{ConvBlock}$ gồm Conv $3\times3$ + BatchNorm + ReLU.
+
+\subsubsection{Thiết kế BottleNeck Block}
+
+BottleNeck Block trong module RA sử dụng cấu trúc nhẹ để giảm chi phí tính toán:
+\begin{equation}
+    \text{BottleNeck}(x) = \text{Conv}_{1\times1}^{C}\left(\text{Conv}_{3\times3}^{C/r}\left(\text{Conv}_{1\times1}^{C/r}(x)\right)\right),
+\end{equation}
+với mỗi convolution được theo sau bởi BatchNorm và ReLU. Reduction ratio $r=4$ giúp giảm kênh trung gian từ $C$ xuống $C/4$ và giới hạn chi phí tính toán bổ sung cho tensor hậu gộp.
+
+\subsubsection{Chiến lược triển khai tăng dần}
+
+Module RA hậu gộp được bật bằng mode \texttt{ra\_fusion} tại block index 0, tương ứng với phép gộp đầu tiên ở tỷ lệ $1/8$. Khi RA bị tắt (mode \texttt{none}), decoder hoạt động giống TransUNet gốc. Một biến thể lịch sử \texttt{ra\_skip} từng áp dụng RA trực tiếp lên skip feature được giữ lại làm đối chứng trong phần thực nghiệm.
+
+Segmentation head cuối cùng gồm convolution $3\times3$ (từ $16$ kênh về $K+1$ lớp) và upsampling $\times 4$ để tạo mặt nạ phân đoạn ở độ phân giải đầy đủ $H \times W$.
+
+\subsection{Hàm mất mát}
+
+Mô hình được huấn luyện với hàm mất mát kết hợp cross-entropy loss và Dice loss:
+\begin{equation}
+    \mathcal{L} = \mathcal{L}_{CE} + \lambda \cdot \mathcal{L}_{Dice},
+\end{equation}
+trong đó $\mathcal{L}_{CE} = -\frac{1}{HW}\sum_{i}\sum_{k} y_i^k \log \hat{y}_i^k$ là cross-entropy trung bình trên pixel, $\mathcal{L}_{Dice} = 1 - \frac{2\sum_i p_i g_i}{\sum_i p_i + \sum_i g_i}$ là Dice loss, và $\lambda = 1.0$. Dice loss giúp xử lý vấn đề mất cân bằng lớp (class imbalance) --- đặc biệt quan trọng cho tuyến tụy vì cơ quan này chiếm tỷ lệ pixel rất nhỏ so với nền.
+
+\begin{table}[t]
+\centering
+\caption{Vai trò của các thành phần chính trong kiến trúc đề xuất.}
+\label{tab:method-blocks}
+\small
+\begin{tabularx}{\textwidth}{p{0.25\textwidth}Y}
+\toprule
+\textbf{Thành phần} & \textbf{Vai trò} \\
+\midrule
+ResNet-50 encoder & Trích xuất đặc trưng cục bộ phân cấp ở 4 tỷ lệ ($1/2$, $1/4$, $1/8$, $1/16$) với số kênh tương ứng $[64, 256, 512, 1024]$. \\
+Module MSCAF & Tinh chỉnh hidden feature $1/16$ theo kênh và không gian trước patch embedding, giúp Transformer nhận token chất lượng cao hơn. \\
+Patch embedding & Chuyển feature map $14\times14$ thành chuỗi 196 token, mỗi token có chiều 768. \\
+Transformer encoder & 12 lớp MSA (12 heads) + MLP, học ngữ cảnh toàn cục giữa tất cả patch. \\
+Cascaded Upsampler & 3 tầng upsampling ($[256, 128, 64, 16]$ kênh), kết hợp skip connections từ CNN ở tỷ lệ $1/8$ và $1/4$. \\
+Module RA + BottleNeck & Tinh chỉnh tensor hậu gộp decoder đầu tiên ở tỷ lệ $1/8$ bằng attention map đảo ngược trước khi phục hồi về tỷ lệ $1/4$ và $1/2$. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Thí nghiệm}
+
+\subsection{Bộ dữ liệu}
+
+Thực nghiệm được thực hiện trên bộ dữ liệu Synapse multi-organ segmentation, theo thiết lập đánh giá của TransUNet \cite{chen2021transunet}. Bộ dữ liệu gồm 30 ca CT bụng với nhãn cho nhiều cơ quan nội tạng. Theo phân chia chuẩn \cite{chen2021transunet}, 18 ca (2211 lát cắt axial) được dùng cho huấn luyện và 12 ca cho kiểm tra. Đánh giá được thực hiện trên toàn bộ volume 3D của 12 ca test, với trọng tâm phân tích cho lớp tuyến tụy --- cơ quan nhỏ nhất và khó phân đoạn nhất trong bộ dữ liệu.
+
+\subsection{Độ đo đánh giá}
+
+\textbf{Dice Similarity Coefficient (DSC)} đo mức chồng lấp giữa mặt nạ dự đoán $P$ và nhãn thật $G$ \cite{taha2015metrics}:
+\begin{equation}
+    \text{DSC}(P,G) = \frac{2|P \cap G|}{|P| + |G|}.
+\end{equation}
+DSC có giá trị từ 0 (không chồng lấp) đến 1 (trùng khớp hoàn toàn). Giá trị trung bình DSC trên tất cả cơ quan (Mean DSC) được dùng để đánh giá hiệu năng tổng thể, trong khi DSC riêng cho tuyến tụy phản ánh khả năng phân đoạn cơ quan khó nhất.
+
+\textbf{Hausdorff Distance 95th percentile (HD95)} đo khoảng cách biên giữa mặt nạ dự đoán và nhãn thật ở phân vị 95\% \cite{taha2015metrics}. Gọi $d(p, \partial G) = \min_{g \in \partial G} \|p - g\|$ là khoảng cách từ điểm $p$ trên biên dự đoán đến biên nhãn. HD95 được định nghĩa:
+\begin{equation}
+    \text{HD95}(P,G) = \text{percentile}_{95}\left(\left\{d(p, \partial G) : p \in \partial P\right\} \cup \left\{d(g, \partial P) : g \in \partial G\right\}\right).
+\end{equation}
+Việc dùng phân vị 95\% thay vì giá trị cực đại giúp giảm ảnh hưởng của các điểm ngoại lệ cực đoan. HD95 thấp hơn cho thấy biên dự đoán gần với biên thật hơn.
+
+\textbf{Accuracy theo voxel} được bổ sung cho các checkpoint còn lưu giữ. Với nhãn dự đoán $\hat{y}_i$ và nhãn thật $y_i$ tại voxel $i$, accuracy toàn volume được tính:
+\begin{equation}
+    \text{Acc}_{\text{voxel}} = \frac{\sum_i \mathbb{1}[\hat{y}_i = y_i]}{N}.
+\end{equation}
+Do background chiếm tỷ lệ lớn trong ảnh CT, chỉ số này có thể cao dù chất lượng phân đoạn cơ quan chưa tốt. Vì vậy, nghiên cứu đồng thời báo cáo foreground voxel accuracy, mean foreground accuracy (macro average recall trên 8 cơ quan) và pancreas accuracy:
+\begin{equation}
+    \text{Acc}_{k} = \frac{\sum_i \mathbb{1}[\hat{y}_i = k \land y_i = k]}{\sum_i \mathbb{1}[y_i = k]}.
+\end{equation}
+Pancreas accuracy là $\text{Acc}_{6}$ theo thứ tự lớp của bộ Synapse. Accuracy không thể suy ra từ DSC và HD95; cần chạy inference trên checkpoint hoặc lưu lại prediction volume tương ứng.
+
+\subsection{Chi tiết cài đặt}
+
+\begin{table}[t]
+\centering
+\caption{Chi tiết cài đặt thực nghiệm.}
+\label{tab:experimental-setup}
+\small
+\begin{tabularx}{\textwidth}{p{0.30\textwidth}Y}
+\toprule
+\textbf{Hạng mục} & \textbf{Thiết lập} \\
+\midrule
+Backbone & ResNet-50 + ViT-B/16 (R50-ViT-B\_16) \\
+Pretrained weights & ImageNet-21k \\
+Kích thước ảnh đầu vào & $224 \times 224$ \\
+Số epoch & 150 \\
+Batch size & 24 \\
+Optimizer & SGD (momentum $= 0.9$, weight decay $= 10^{-4}$) \\
+Learning rate & $0.01$ với polynomial decay (power $= 0.9$) \\
+Loss function & Cross-entropy + Dice loss ($\lambda = 1.0$) \\
+Data augmentation & Random flip, random rotation \\
+Module MSCAF & Channel-Spatial Attention, reduction $r = 16$ \\
+Vị trí MSCAF & Tại hidden feature $1/16$ trước patch embedding \\
+Module RA hậu gộp & Mode \texttt{ra\_fusion}, block index $0$, reduction $r = 4$ \\
+Vị trí RA hậu gộp & Sau phép concatenate decoder đầu tiên ở tỷ lệ $1/8$ \\
+GPU & NVIDIA Tesla T4 (Google Colab) \\
+Framework & PyTorch 1.x \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Mô hình sử dụng pretrained weights từ ImageNet-21k cho cả ResNet-50 và ViT-B/16, theo cách khởi tạo của TransUNet gốc \cite{chen2021transunet}. Data augmentation bao gồm random horizontal flip và random rotation. Tất cả thí nghiệm được thực hiện trên single GPU với cùng random seed để đảm bảo tính tái lập.
+
+Hai notebook hoàn tất gần nhất tiếp tục từ checkpoint được lưu trên Google Drive: cấu hình MSCAF \texttt{pre\_hidden} run 02 tiếp tục từ epoch 145 và cấu hình \texttt{ra\_fusion} tiếp tục từ epoch 148. Vì vậy, các kết quả này được ghi nhận là kết quả hoàn tất từ checkpoint, không được diễn giải như hai lần huấn luyện fresh độc lập.
+
+\subsection{So sánh với các phương pháp khác}
+
+Bảng~\ref{tab:comparison-sota} trình bày kết quả so sánh phương pháp đề xuất với các phương pháp hiện có trên bộ dữ liệu Synapse. Các kết quả tham chiếu được lấy từ bài báo TransUNet \cite{chen2021transunet}.
+
+\begin{table}[t]
+\centering
+\caption{So sánh kết quả phân đoạn tuyến tụy trên bộ dữ liệu Synapse. Các dòng baseline tham chiếu từ \cite{chen2021transunet}; các dòng MSCAF-TransUNet là kết quả thực nghiệm của nghiên cứu.}
+\label{tab:comparison-sota}
+\small
+\begin{tabularx}{\textwidth}{p{0.27\textwidth}C C C C}
+\toprule
+\textbf{Phương pháp} & \textbf{Mean DSC $\uparrow$} & \textbf{Mean HD95 $\downarrow$} & \textbf{Pancreas DSC $\uparrow$} & \textbf{Pancreas HD95 $\downarrow$} \\
+\midrule
+V-Net \cite{chen2021transunet} & 68.81 & -- & 40.05 & -- \\
+DARR \cite{chen2021transunet} & 69.77 & -- & 53.77 & -- \\
+R50 Att-UNet \cite{chen2021transunet} & 75.57 & 36.97 & 53.58 & -- \\
+ViT-CUP \cite{chen2021transunet} & 68.86 & 32.87 & 45.99 & -- \\
+R50-ViT-CUP \cite{chen2021transunet} & 71.29 & 32.87 & 51.73 & -- \\
+TransUNet \cite{chen2021transunet} & 77.48 & 31.69 & 55.86 & -- \\
+\midrule
+MSCAF \texttt{cnn\_fusion} 3 scale & 76.61 & 28.80 & \textbf{57.36} & -- \\
+MSCAF \texttt{pre\_hidden} run 01 & \textbf{78.31} & 29.88 & 54.95 & 13.91 \\
+MSCAF \texttt{pre\_hidden} run 02 & 78.06 & 28.85 & 56.47 & \textbf{13.65} \\
+MSCAF + RA skip lịch sử & 78.18 & 31.89 & 55.39 & 19.29 \\
+MSCAF + RA hậu gộp & 77.81 & \textbf{28.05} & 57.14 & 14.54 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Từ Bảng~\ref{tab:comparison-sota}, có thể nhận thấy:
+
+\textbf{So sánh tổng thể.} Cấu hình MSCAF \texttt{pre\_hidden} run 01 đạt Mean DSC cao nhất là $78.31\%$, cao hơn TransUNet gốc $0.83$ điểm phần trăm. Biến thể RA hậu gộp đạt Mean HD95 tốt nhất là $28.05$ mm, giảm $3.64$ mm so với TransUNet gốc ($31.69$ mm). Điều này cho thấy block hậu gộp có lợi rõ hơn cho độ chính xác biên tổng thể so với độ chồng lấp trung bình.
+
+\textbf{So sánh riêng tuyến tụy.} Biến thể RA hậu gộp đạt Pancreas DSC $57.14\%$, cao hơn TransUNet gốc $1.28$ điểm phần trăm. Cấu hình \texttt{cnn\_fusion} 3 scale đạt Pancreas DSC cao nhất trong registry là $57.36\%$, trong khi \texttt{pre\_hidden} run 02 đạt Pancreas HD95 thấp nhất là $13.65$ mm. Kết quả này cho thấy các vị trí attention khác nhau có thế mạnh khác nhau: \texttt{pre\_hidden} ổn định chỉ số tổng thể, còn fusion đa scale và RA hậu gộp cải thiện riêng lớp tuyến tụy.
+
+\textbf{So sánh RA lịch sử và RA hậu gộp.} So với biến thể RA skip lịch sử, RA hậu gộp cải thiện Pancreas DSC từ $55.39\%$ lên $57.14\%$ và giảm Mean HD95 từ $31.89$ xuống $28.05$ mm. Kết quả ủng hộ nhận định rằng vị trí sau phép gộp đầu tiên phù hợp hơn vì module nhận đồng thời thông tin từ nhánh decoder và skip feature.
+
+\subsection{Phân tích Ablation}
+
+Để đánh giá đóng góp của từng thành phần, Bảng~\ref{tab:ablation} trình bày kết quả ablation study với các cấu hình khác nhau.
+
+\begin{table}[t]
+\centering
+\caption{Ablation study: Tác động của vị trí attention đối với các chỉ số tổng thể và lớp tuyến tụy.}
+\label{tab:ablation}
+\small
+\begin{tabularx}{\textwidth}{p{0.32\textwidth}C C C C}
+\toprule
+\textbf{Cấu hình} & \textbf{Mean DSC} & \textbf{Mean HD95} & \textbf{Pancreas DSC} & \textbf{Pancreas HD95} \\
+\midrule
+TransUNet tham chiếu & 77.48 & 31.69 & 55.86 & -- \\
+MSCAF \texttt{pre\_hidden} run 01 & \textbf{78.31} & 29.88 & 54.95 & 13.91 \\
+MSCAF \texttt{pre\_hidden} run 02 & 78.06 & 28.85 & 56.47 & \textbf{13.65} \\
+MSCAF + \texttt{ra\_skip} lịch sử & 78.18 & 31.89 & 55.39 & 19.29 \\
+MSCAF + \texttt{ra\_fusion} & 77.81 & \textbf{28.05} & \textbf{57.14} & 14.54 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Tác động của module MSCAF.} Hai run \texttt{pre\_hidden} đạt Mean DSC lần lượt là $78.31\%$ và $78.06\%$, đều cao hơn TransUNet tham chiếu ($77.48\%$). Run 02 đồng thời cải thiện Pancreas DSC lên $56.47\%$ và Pancreas HD95 xuống $13.65$ mm. Điều này cho thấy tinh chỉnh hidden feature $1/16$ trước patch embedding là một lựa chọn có hiệu quả ổn định.
+
+\textbf{Tác động của vị trí RA.} Biến thể lịch sử \texttt{ra\_skip} chưa cải thiện đồng thời các chỉ số: Mean HD95 tăng lên $31.89$ mm và Pancreas DSC chỉ đạt $55.39\%$. Khi chuyển cùng ý tưởng attention đảo ngược sang tensor hậu gộp đầu tiên, \texttt{ra\_fusion} giảm Mean HD95 xuống $28.05$ mm và tăng Pancreas DSC lên $57.14\%$. Kết quả thực nghiệm phù hợp với giả thuyết thiết kế: tensor hậu gộp giàu thông tin hơn skip feature đơn lẻ.
+
+\textbf{Nhận xét.} Không có một cấu hình duy nhất tốt nhất trên mọi chỉ số. MSCAF \texttt{pre\_hidden} run 01 dẫn đầu Mean DSC, run 02 dẫn đầu Pancreas HD95, và \texttt{ra\_fusion} dẫn đầu Mean HD95 trong nhóm ablation đồng thời cải thiện Pancreas DSC. Vì hai run mới nhất hoàn tất từ checkpoint, cần bổ sung các lần huấn luyện fresh độc lập nếu muốn báo cáo độ lệch chuẩn.
+
+\subsection{Thảo luận}
+
+\textbf{Vai trò của module MSCAF.} Module MSCAF đạt Mean DSC tốt nhất $78.31\%$ và Mean HD95 $29.88$ mm trong run 01, cải thiện so với TransUNet gốc trên cả hai chỉ số tổng thể. Điều này cho thấy việc tinh chỉnh feature tại điểm chuyển tiếp CNN-Transformer bằng channel-spatial attention có hiệu quả: Transformer nhận được chuỗi token đã được chọn lọc tốt hơn, giúp học quan hệ toàn cục hiệu quả hơn.
+
+\textbf{Vai trò của block hậu gộp.} Kết quả \texttt{ra\_fusion} xác nhận hướng bổ sung Reverse Attention kết hợp BottleNeck ở giữa hai lượt encoder và decoder theo yêu cầu thiết kế. Block này không thay thế MSCAF phía encoder mà xử lý tensor vừa gộp ở decoder, nhờ đó cải thiện Pancreas DSC lên $57.14\%$ và Mean HD95 xuống $28.05$ mm.
+
+\textbf{Liên hệ với thiết kế TransUNet.} TransUNet \cite{chen2021transunet} nhấn mạnh rằng Transformer có thể đóng vai trò encoder mạnh cho phân đoạn ảnh y khoa, với sự kết hợp của U-Net để tăng cường chi tiết thông qua khôi phục thông tin không gian cục bộ. Phương pháp đề xuất mở rộng ý tưởng này bằng cách cải thiện chất lượng token đầu vào cho Transformer thông qua module MSCAF --- kết quả thực nghiệm xác nhận hướng tiếp cận này có hiệu quả trên chỉ số tổng thể (Mean DSC tăng, Mean HD95 giảm so với TransUNet gốc).
+
+\textbf{Hạn chế.} Hai run mới nhất hoàn tất từ checkpoint thay vì được huấn luyện fresh độc lập, nên chưa đủ để ước lượng phương sai giữa các lần chạy. Các artifact và checkpoint lịch sử đã bị xóa không thể được bổ sung accuracy một cách chính xác chỉ từ DSC và HD95; accuracy chỉ được phục hồi cho các checkpoint mới còn lưu giữ bằng cách chạy lại inference. Nghiên cứu cũng chưa thực hiện thí nghiệm trên bộ dữ liệu thứ hai và chưa khảo sát việc mở rộng block hậu gộp sang nhiều scale decoder.
+
+\section{Kết luận}
+
+Bài viết đã trình bày phương pháp MSCAF-TransUNet với cơ chế attention đa tầng cho bài toán phân đoạn ảnh tuyến tụy trên CT bụng. Phương pháp giữ nguyên khung CNN-Transformer hybrid encoder và Cascaded Upsampler decoder của TransUNet, đồng thời bổ sung: (1) module MSCAF với channel attention và spatial attention \cite{woo2018cbam} theo cơ chế residual connection \cite{he2016resnet} tại hidden CNN feature $1/16$ trước patch embedding; và (2) module Reverse Attention kết hợp BottleNeck \cite{li2024rtaformer} ngay sau phép gộp decoder đầu tiên ở tỷ lệ $1/8$.
+
+Kết quả thực nghiệm trên bộ dữ liệu Synapse cho thấy MSCAF \texttt{pre\_hidden} run 01 đạt Mean DSC $78.31\%$ và Mean HD95 $29.88$ mm, cải thiện so với TransUNet gốc ($77.48\%$ DSC, $31.69$ HD95) trên cả hai chỉ số tổng thể. Biến thể RA hậu gộp đạt Mean DSC $77.81\%$, Mean HD95 $28.05$ mm và Pancreas DSC $57.14\%$. So với TransUNet gốc, chỉ số Pancreas DSC tăng $1.28$ điểm phần trăm và Mean HD95 giảm $3.64$ mm. So với biến thể RA skip lịch sử, kết quả này cũng tốt hơn trên cả Pancreas DSC và Mean HD95, qua đó ủng hộ vị trí hậu gộp được đề xuất.
+
+Hướng phát triển tiếp theo bao gồm: (1) thực hiện thêm các lần huấn luyện fresh độc lập để báo cáo trung bình và độ lệch chuẩn; (2) đánh giá hiệu quả của Reverse Attention hậu gộp khi mở rộng sang nhiều scale ($1/8$, $1/4$, $1/2$); (3) đánh giá trên bộ dữ liệu tuyến tụy chuyên biệt với số lượng ca lớn hơn; và (4) khảo sát các biến thể RA khác như boundary-aware loss kết hợp.
+
+Mã nguồn và mô hình được công bố tại: \url{https://github.com/ihatesea69/MSCAF-TransUNet}.
+
+\bibliographystyle{ieeetr}
+\bibliography{references}
+
+\end{document}

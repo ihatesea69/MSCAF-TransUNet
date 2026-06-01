@@ -1,6 +1,6 @@
 # MSCAF-TransUNet Result Registry
 
-This registry keeps lightweight, source-control friendly result records. Large binary artifacts stay outside Git and are referenced by their Colab or Drive paths.
+This registry keeps lightweight, source-control friendly result records. Small notebook backups and paper outputs can be committed directly; large binary artifacts stay outside Git and are referenced by their Colab or Drive paths.
 
 ## Completed Runs
 
@@ -40,6 +40,6 @@ The two `pre_hidden` runs share one snapshot zip filename. If Drive no longer co
 
 ## Artifact Policy
 
-- Commit text result registries, notebook definitions, and source code.
-- Keep model checkpoints, prediction volumes, compiled reports, paper PDFs, and generated images outside Git.
-- Use Google Drive, GitHub Releases, or another artifact store for binary outputs that need long-term retention.
+- Commit text result registries, notebook definitions, source code, small notebook backups, and small paper/report outputs.
+- Keep model checkpoints, prediction volumes, large generated reports, and large generated images outside Git.
+- Use Google Drive, GitHub Releases, or another artifact store for large binary outputs that need long-term retention.

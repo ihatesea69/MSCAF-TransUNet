@@ -20,9 +20,7 @@ env/
 /data/
 /model/
 /predictions/
-/artifacts/
 /results/
-/output/
 /archive/
 /resume_checkpoints/
 *.pth

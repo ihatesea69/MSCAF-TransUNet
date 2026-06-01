@@ -15,7 +15,7 @@ This repo currently centers on **MSCAF-TransUNet** and its related ablations on 
 
 ## Result snapshot
 
-Tracked result records live in [docs/results/results_summary.md](docs/results/results_summary.md) and [docs/results/run_registry.json](docs/results/run_registry.json). Large binary outputs are kept outside Git.
+Tracked result records live in [docs/results/results_summary.md](docs/results/results_summary.md) and [docs/results/run_registry.json](docs/results/run_registry.json). Lightweight artifacts and paper outputs are versioned when they are small enough for Git; datasets, checkpoints, and prediction volumes stay outside the repository.
 
 Accuracy cannot be reconstructed from Dice and HD95 alone. Use [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb) when retained NIfTI predictions still exist. If old artifacts were deleted but the latest checkpoints remain on Drive, use [notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb](notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb) to rerun inference without retraining.
 
@@ -57,6 +57,8 @@ splits/            explicit train/test split metadata
 networks/          TransUNet model + hybrid encoder attention modules
 notebooks/         Colab notebooks for Drive bootstrap and end-to-end experiments
 docs/results/      lightweight result registry and artifact manifest
+artifacts/         lightweight local notebook backups and small retained research artifacts
+output/            lightweight paper/report outputs such as LaTeX source and PDFs
 train.py           training entrypoint
 test.py            evaluation entrypoint
 trainer.py         training loop with epoch-level resume checkpointing
@@ -178,9 +180,9 @@ For reproducibility on Google Colab:
 
 ## Artifact policy
 
-- Commit source code, split metadata, notebooks, and lightweight result registries.
-- Keep checkpoints, prediction volumes, compiled reports, generated figures, paper PDFs, and local work archives outside Git.
-- Reference retained binary outputs from README or `docs/results/` using Drive, Colab, or GitHub Release paths.
+- Commit source code, split metadata, notebooks, lightweight result registries, small notebook backups, and small paper/report outputs.
+- Keep datasets, model checkpoints, prediction volumes, large generated exports, and runtime caches outside Git.
+- Reference large retained outputs from README or `docs/results/` using Drive, Colab, or GitHub Release paths.
 
 ## Notes
 
