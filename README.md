@@ -17,7 +17,7 @@ This repo currently centers on **MSCAF-TransUNet** and its related ablations on 
 
 Tracked result records live in [docs/results/results_summary.md](docs/results/results_summary.md) and [docs/results/run_registry.json](docs/results/run_registry.json). Large binary outputs are kept outside Git.
 
-Accuracy cannot be reconstructed from Dice and HD95 alone. Use [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb) to calculate voxel accuracy, foreground macro accuracy, and pancreas accuracy from the retained NIfTI predictions in Drive artifact zips.
+Accuracy cannot be reconstructed from Dice and HD95 alone. Use [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb) when retained NIfTI predictions still exist. If old artifacts were deleted but the latest checkpoints remain on Drive, use [notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb](notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb) to rerun inference without retraining.
 
 Current completed runs:
 
@@ -162,6 +162,8 @@ Save NIfTI predictions:
 python test.py --dataset Synapse --vit_name R50-ViT-B_16 --is_savenii
 ```
 
+Evaluation logs include `voxel_accuracy`, `foreground_voxel_accuracy`, `mean_foreground_accuracy`, and `pancreas_accuracy`. Use the foreground metrics for research comparisons because whole-volume voxel accuracy can be dominated by background.
+
 ## Colab notebooks
 
 For reproducibility on Google Colab:
@@ -172,6 +174,7 @@ For reproducibility on Google Colab:
 - [notebooks/transunet-reverse-bottleneck-fusion.ipynb](notebooks/transunet-reverse-bottleneck-fusion.ipynb): completed advisor-requested reverse attention + bottleneck fusion at the first `1/8` decoder merge
 - [notebooks/transunet-mscaf-reverse-attention.ipynb](notebooks/transunet-mscaf-reverse-attention.ipynb): historical completed Reverse Attention `s0/r4` artifact with retained metrics
 - [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb): calculate accuracy for every retained prediction artifact without retraining; reports missing or ambiguous zips explicitly
+- [notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb](notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb): rerun inference for the two latest retained checkpoints and export measured accuracy when prediction artifacts have already been deleted
 
 ## Artifact policy
 

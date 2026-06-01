@@ -19,6 +19,8 @@ The two latest notebook completions resumed existing Drive checkpoints: `pre_hid
 
 Accuracy cannot be derived from the retained Dice and HD95 values. Run `notebooks/transunet-calculate-artifact-accuracy.ipynb` to calculate it from the NIfTI predictions stored inside Drive artifact zips.
 
+If historical artifacts were deleted but the two latest Drive checkpoints remain, run `notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb`. It reruns inference only for `pre_hidden_1_16_r16_run_02` and `reverse_bottleneck_fusion_s0_r4_run_01`; it does not retrain either model.
+
 The post-processing notebook exports:
 
 - `voxel_accuracy`: all correctly classified voxels divided by all voxels, including background

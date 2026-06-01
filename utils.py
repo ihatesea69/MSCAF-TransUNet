@@ -58,7 +58,51 @@ def calculate_metric_percase(pred, gt):
         return 0, 0
 
 
-def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_save_path=None, case=None, z_spacing=1):
+def calculate_confusion_matrix(prediction, label, classes):
+    prediction = np.asarray(prediction, dtype=np.int64).ravel()
+    label = np.asarray(label, dtype=np.int64).ravel()
+    valid = (
+        (label >= 0)
+        & (label < classes)
+        & (prediction >= 0)
+        & (prediction < classes)
+    )
+    encoded = classes * label[valid] + prediction[valid]
+    return np.bincount(encoded, minlength=classes ** 2).reshape(classes, classes)
+
+
+def summarize_accuracy_confusion(confusion, pancreas_class=6):
+    confusion = np.asarray(confusion, dtype=np.int64)
+    true_counts = confusion.sum(axis=1)
+    diagonal = np.diag(confusion)
+    total = confusion.sum()
+
+    class_accuracy = np.divide(
+        diagonal,
+        true_counts,
+        out=np.full(diagonal.shape, np.nan, dtype=np.float64),
+        where=true_counts != 0,
+    )
+    foreground_accuracy = (
+        float(diagonal[1:].sum() / true_counts[1:].sum())
+        if true_counts[1:].sum()
+        else float("nan")
+    )
+    return {
+        "voxel_accuracy": float(diagonal.sum() / total) if total else float("nan"),
+        "foreground_voxel_accuracy": foreground_accuracy,
+        "mean_foreground_accuracy": float(np.nanmean(class_accuracy[1:])),
+        "pancreas_accuracy": (
+            float(class_accuracy[pancreas_class])
+            if pancreas_class < len(class_accuracy)
+            else float("nan")
+        ),
+        "class_accuracy": class_accuracy,
+    }
+
+
+def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_save_path=None, case=None, z_spacing=1,
+                       return_confusion=False):
     device = next(net.parameters()).device
     image, label = image.squeeze(0).cpu().detach().numpy(), label.squeeze(0).cpu().detach().numpy()
     if len(image.shape) == 3:
@@ -100,4 +144,6 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
         sitk.WriteImage(prd_itk, test_save_path + '/'+case + "_pred.nii.gz")
         sitk.WriteImage(img_itk, test_save_path + '/'+ case + "_img.nii.gz")
         sitk.WriteImage(lab_itk, test_save_path + '/'+ case + "_gt.nii.gz")
+    if return_confusion:
+        return metric_list, calculate_confusion_matrix(prediction, label, classes)
     return metric_list
