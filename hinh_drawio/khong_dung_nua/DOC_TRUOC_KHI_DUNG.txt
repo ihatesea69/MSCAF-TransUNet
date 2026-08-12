@@ -1,0 +1,9 @@
+Hình 3.1 trong khóa luận KHÔNG dùng bản draw.io này.
+
+Theo yêu cầu ngày 06/08/2026, Hình 3.1 lấy đúng Figure 1 của bài báo TransUNet
+gốc (Chen và cộng sự, arXiv:2102.04306 — tài liệu tham khảo [8]) và dẫn nguồn
+ngay trong chú thích hình.
+
+Bản draw.io tự vẽ dưới đây giữ lại phòng khi cần cho slide bảo vệ; muốn dùng lại
+thì chuyển ngược lên thư mục hinh_drawio/ rồi sửa ANH_MOI trong
+.fmt_audit/revise_r5.py.

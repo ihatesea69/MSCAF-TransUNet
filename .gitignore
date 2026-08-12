@@ -70,3 +70,13 @@ desktop.ini
 # Misc
 *.tar.gz
 *.zip
+
+# drawio autosave backups
+.$*.bkp
+
+# Large templates and intermediates (tai lai / build lai duoc)
+/Template.pptx
+/slides/_thu_khung.pptx
+/slides/template_hoi_nghi/
+/slides/KLTN - Bao ve - Danh Hoang Hieu Nghi - K29.pptx
+/KLTN - Bao ve - Danh Hoang Hieu Nghi - K29 \[Repaired\].pptx
