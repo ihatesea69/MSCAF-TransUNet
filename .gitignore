@@ -10,11 +10,19 @@ build/
 
 # Virtual environments
 .venv/
+.venv*/
 venv/
 env/
 
 # Local agent/tool state
 .omx/
+.claude/worktrees/
+
+# Tool scratch dirs (regenerable render/audit output)
+.tmp_*/
+.fmt_audit/
+.paper_rewrite_work/
+.rewrite_style/
 
 # Data and model weights (too large for git)
 /data/

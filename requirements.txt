@@ -8,3 +8,4 @@ scipy
 h5py
 tqdm
 gdown
+gradio

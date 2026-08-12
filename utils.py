@@ -4,6 +4,7 @@ from medpy import metric
 from scipy.ndimage import zoom
 import torch.nn as nn
 import SimpleITK as sitk
+from pathlib import Path
 
 
 class DiceLoss(nn.Module):
@@ -51,11 +52,11 @@ def calculate_metric_percase(pred, gt):
     if pred.sum() > 0 and gt.sum()>0:
         dice = metric.binary.dc(pred, gt)
         hd95 = metric.binary.hd95(pred, gt)
-        return dice, hd95
-    elif pred.sum() > 0 and gt.sum()==0:
-        return 1, 0
-    else:
-        return 0, 0
+        jaccard = metric.binary.jc(pred, gt)
+        return dice, hd95, jaccard
+    # Do not score false positives as perfect Dice when the ground truth is empty.
+    # Empty true-negative cases are tracked separately in per-case artifacts.
+    return 0, 0, 0
 
 
 def calculate_confusion_matrix(prediction, label, classes):
@@ -135,15 +136,17 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
         metric_list.append(calculate_metric_percase(prediction == i, label == i))
 
     if test_save_path is not None:
+        test_save_path = Path(test_save_path)
+        test_save_path.mkdir(parents=True, exist_ok=True)
         img_itk = sitk.GetImageFromArray(image.astype(np.float32))
         prd_itk = sitk.GetImageFromArray(prediction.astype(np.float32))
         lab_itk = sitk.GetImageFromArray(label.astype(np.float32))
         img_itk.SetSpacing((1, 1, z_spacing))
         prd_itk.SetSpacing((1, 1, z_spacing))
         lab_itk.SetSpacing((1, 1, z_spacing))
-        sitk.WriteImage(prd_itk, test_save_path + '/'+case + "_pred.nii.gz")
-        sitk.WriteImage(img_itk, test_save_path + '/'+ case + "_img.nii.gz")
-        sitk.WriteImage(lab_itk, test_save_path + '/'+ case + "_gt.nii.gz")
+        sitk.WriteImage(prd_itk, str(test_save_path / f"{case}_pred.nii.gz"))
+        sitk.WriteImage(img_itk, str(test_save_path / f"{case}_img.nii.gz"))
+        sitk.WriteImage(lab_itk, str(test_save_path / f"{case}_gt.nii.gz"))
     if return_confusion:
         return metric_list, calculate_confusion_matrix(prediction, label, classes)
     return metric_list

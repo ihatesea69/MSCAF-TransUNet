@@ -85,13 +85,38 @@ def load_artifact_map(path: Path | None) -> dict[str, Path]:
 
 
 def artifact_basename(run: dict[str, object]) -> str | None:
-    artifact_path = run.get("artifact_zip_colab")
-    if artifact_path:
-        return PurePosixPath(str(artifact_path)).name
+    for key in ("artifact_zip", "artifact_zip_drive", "artifact_zip_colab"):
+        artifact_path = run.get(key)
+        if artifact_path:
+            return PurePosixPath(str(artifact_path)).name
+    official_runner = run.get("official_runner")
+    if official_runner and run.get("snapshot_name") and run.get("run_id"):
+        return f"{run['run_id']}__official_beckschen__{run['snapshot_name']}.zip"
+    artifact = run.get("artifact")
+    if isinstance(artifact, dict):
+        for key in ("zip", "drive_zip", "colab_zip"):
+            artifact_path = artifact.get(key)
+            if artifact_path:
+                return PurePosixPath(str(artifact_path)).name
     snapshot_name = run.get("snapshot_name")
     if snapshot_name:
         return f"{snapshot_name}.zip"
     return None
+
+
+def registered_artifact_paths(run: dict[str, object]) -> list[Path]:
+    paths = []
+    for key in ("artifact_zip", "artifact_zip_drive", "artifact_zip_colab"):
+        artifact_path = run.get(key)
+        if artifact_path:
+            paths.append(Path(str(artifact_path)).expanduser())
+    artifact = run.get("artifact")
+    if isinstance(artifact, dict):
+        for key in ("zip", "drive_zip", "colab_zip"):
+            artifact_path = artifact.get(key)
+            if artifact_path:
+                paths.append(Path(str(artifact_path)).expanduser())
+    return paths
 
 
 def resolve_artifact(
@@ -107,6 +132,10 @@ def resolve_artifact(
             return explicit_path, None
         return None, f"explicit artifact does not exist: {explicit_path}"
 
+    for registered_path in registered_artifact_paths(run):
+        if registered_path.exists():
+            return registered_path, None
+
     basename = artifact_basename(run)
     if basename is None:
         return None, "registry does not provide an artifact filename; add it to --artifact-map"
@@ -118,7 +147,10 @@ def resolve_artifact(
 
     artifact_path = artifact_dir / basename
     if not artifact_path.exists():
-        return None, f"artifact zip not found: {artifact_path}"
+        nested_artifact_path = artifact_dir / run_id / basename
+        if nested_artifact_path.exists():
+            return nested_artifact_path, None
+        return None, f"artifact zip not found: {artifact_path} or {nested_artifact_path}"
     return artifact_path, None
 
 
@@ -202,6 +234,12 @@ def mean_present(values: list[float | None]) -> float | None:
     return float(np.mean(present))
 
 
+def percent_or_none(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return float(value) * 100
+
+
 def summarize_confusion(confusion: np.ndarray, class_names: tuple[str, ...]) -> dict[str, object]:
     true_counts = confusion.sum(axis=1)
     predicted_counts = confusion.sum(axis=0)
@@ -210,25 +248,45 @@ def summarize_confusion(confusion: np.ndarray, class_names: tuple[str, ...]) -> 
 
     per_class = []
     for class_id, class_name in enumerate(class_names):
+        tp = int(diagonal[class_id])
+        fp = int(predicted_counts[class_id] - diagonal[class_id])
+        fn = int(true_counts[class_id] - diagonal[class_id])
+        accuracy = safe_ratio(diagonal[class_id], true_counts[class_id])
+        jaccard = safe_ratio(tp, tp + fp + fn)
         per_class.append(
             {
                 "class_id": class_id,
                 "class_name": class_name,
-                "accuracy": safe_ratio(diagonal[class_id], true_counts[class_id]),
+                "accuracy": accuracy,
+                "accuracy_percent": percent_or_none(accuracy),
+                "jaccard": jaccard,
+                "jaccard_percent": percent_or_none(jaccard),
                 "true_voxels": int(true_counts[class_id]),
                 "predicted_voxels": int(predicted_counts[class_id]),
-                "correct_voxels": int(diagonal[class_id]),
+                "correct_voxels": tp,
             }
         )
 
     foreground_accuracy = safe_ratio(diagonal[1:].sum(), true_counts[1:].sum())
     foreground_class_accuracies = [item["accuracy"] for item in per_class[1:]]
+    foreground_class_jaccards = [item["jaccard"] for item in per_class[1:]]
     pancreas = per_class[6] if len(per_class) > 6 else None
+    voxel_accuracy = safe_ratio(diagonal.sum(), total)
+    mean_foreground_accuracy = mean_present(foreground_class_accuracies)
+    mean_foreground_jaccard = mean_present(foreground_class_jaccards)
     return {
-        "voxel_accuracy": safe_ratio(diagonal.sum(), total),
+        "voxel_accuracy": voxel_accuracy,
+        "voxel_accuracy_percent": percent_or_none(voxel_accuracy),
         "foreground_voxel_accuracy": foreground_accuracy,
-        "mean_foreground_accuracy": mean_present(foreground_class_accuracies),
+        "foreground_voxel_accuracy_percent": percent_or_none(foreground_accuracy),
+        "mean_foreground_accuracy": mean_foreground_accuracy,
+        "mean_foreground_accuracy_percent": percent_or_none(mean_foreground_accuracy),
         "pancreas_accuracy": pancreas["accuracy"] if pancreas else None,
+        "pancreas_accuracy_percent": pancreas["accuracy_percent"] if pancreas else None,
+        "mean_foreground_jaccard": mean_foreground_jaccard,
+        "mean_foreground_jaccard_percent": percent_or_none(mean_foreground_jaccard),
+        "pancreas_jaccard": pancreas["jaccard"] if pancreas else None,
+        "pancreas_jaccard_percent": pancreas["jaccard_percent"] if pancreas else None,
         "valid_voxels": int(total),
         "confusion_matrix": confusion.tolist(),
         "per_class": per_class,
@@ -274,24 +332,28 @@ def write_markdown(path: Path, results: list[dict[str, object]]) -> None:
         "- `Foreground voxel accuracy`: correctly classified organ voxels divided by all ground-truth organ voxels.",
         "- `Mean foreground accuracy`: macro average of per-organ recall across the 8 Synapse organs.",
         "- `Pancreas accuracy`: recall for Synapse class `6`.",
+        "- `Mean foreground Jaccard`: macro average of per-organ Jaccard/IoU across the 8 Synapse organs.",
+        "- `Pancreas Jaccard`: Jaccard/IoU for Synapse class `6`.",
         "",
-        "| Run | Status | Voxel accuracy | Foreground voxel accuracy | Mean foreground accuracy | Pancreas accuracy |",
-        "|---|---|---:|---:|---:|---:|",
+        "| Run | Status | Voxel accuracy | Foreground voxel accuracy | Mean foreground accuracy | Pancreas accuracy | Mean foreground Jaccard | Pancreas Jaccard |",
+        "|---|---|---:|---:|---:|---:|---:|---:|",
     ]
     for result in results:
         metrics = result.get("accuracy", {})
         lines.append(
-            "| `{run_id}` | {status} | {voxel} | {foreground} | {macro} | {pancreas} |".format(
+            "| `{run_id}` | {status} | {voxel} | {foreground} | {macro} | {pancreas} | {mean_jaccard} | {pancreas_jaccard} |".format(
                 run_id=result["run_id"],
                 status=result["status"],
                 voxel=format_percent(metrics.get("voxel_accuracy")),
                 foreground=format_percent(metrics.get("foreground_voxel_accuracy")),
                 macro=format_percent(metrics.get("mean_foreground_accuracy")),
                 pancreas=format_percent(metrics.get("pancreas_accuracy")),
+                mean_jaccard=format_percent(metrics.get("mean_foreground_jaccard")),
+                pancreas_jaccard=format_percent(metrics.get("pancreas_jaccard")),
             )
         )
         if result.get("reason"):
-            lines.append(f"|  | `{result['reason']}` |  |  |  |  |")
+            lines.append(f"|  | `{result['reason']}` |  |  |  |  |  |  |")
     lines.append("")
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -300,7 +362,11 @@ def main() -> int:
     args = parse_args()
     registry = load_json(args.registry)
     runs = registry["results"]
-    completed_runs = [run for run in runs if run.get("status") == "completed"]
+    completed_runs = [
+        run
+        for run in runs
+        if str(run.get("status", "")).startswith("completed")
+    ]
     artifact_map = load_artifact_map(args.artifact_map)
     basenames = [artifact_basename(run) for run in completed_runs]
     basename_counts = Counter(basename for basename in basenames if basename)
