@@ -17,15 +17,19 @@ This repo currently centers on **MSCAF-TransUNet** and its related ablations on 
 
 Tracked result records live in [docs/results/results_summary.md](docs/results/results_summary.md) and [docs/results/run_registry.json](docs/results/run_registry.json). Large binary outputs are kept outside Git.
 
-Accuracy cannot be reconstructed from Dice and HD95 alone. Use [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb) when retained NIfTI predictions still exist. If old artifacts were deleted but the latest checkpoints remain on Drive, use [notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb](notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb) to rerun inference without retraining.
+Accuracy cannot be reconstructed from Dice and HD95 alone. Numbered notebooks `01`-`06` map to one LaTeX result row and one `run_id` in [docs/results/run_registry.json](docs/results/run_registry.json). Notebook `07` is an optional Synapse repeat on the same project training flow. Use [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb) when retained NIfTI predictions still exist. If old artifacts were deleted but the latest checkpoints remain on Drive, rerun the matching numbered notebook with `RUN_TRAIN = False` and `RUN_TEST = True`.
 
-Current completed runs:
+Current report rows with pancreas metrics:
 
-- `mscaf_cnn_fusion_3scale`: `cnn_fusion` on `1/8,1/4,1/2`, Mean Dice `76.61%`, Mean HD95 `28.80`
-- `pre_hidden_1_16_r16_run_01`: `pre_hidden` on `1/16`, Mean Dice `78.3119%`, Mean HD95 `29.879884`, Pancreas Dice `0.549484`
-- `pre_hidden_1_16_r16_run_02`: `pre_hidden` on `1/16`, Mean Dice `78.0560%`, Mean HD95 `28.846281`, Pancreas Dice `0.564749`
-- `reverse_attention_s0_r4_run_01`: `pre_hidden` on `1/16` with RA skip `0`, reduction `4`, Mean Dice `78.1807%`, Mean HD95 `31.889628`, Pancreas Dice `0.553947`
-- `reverse_bottleneck_fusion_s0_r4_run_01`: `pre_hidden` on `1/16` with post-fusion RA block `0`, reduction `4`, Mean Dice `77.8149%`, Mean HD95 `28.049328`, Pancreas Dice `0.571350`
+| Run | Method | Pancreas Dice | Pancreas HD95 | Pancreas Jaccard | Pancreas Accuracy |
+|---|---|---:|---:|---:|---:|
+| `baseline_reproduction` | TransUNet baseline | `54.3675%` | `15.3753` | `39.6635%` | `44.4120%` |
+| `mscaf_cnn_fusion_3scale` | CBAM multi-scale CNN fusion | `58.9334%` | `13.2034` | `44.2381%` | `50.2227%` |
+| `pre_hidden_1_16_r16_run_03` | CBAM before patch embedding | `59.2291%` | `12.9671` | `43.9398%` | `48.9431%` |
+| `reverse_attention_s0_r4_run_01` | CBAM + RA on skip feature | `58.3154%` | `32.1677` | `42.9503%` | `52.3272%` |
+| `reverse_bottleneck_fusion_s0_r4_run_01` | CBAM + RA after decoder-skip concat | `55.9470%` | `13.1270` | `40.9862%` | `46.2828%` |
+
+`Pancreas Accuracy` is read from `accuracy.pancreas_accuracy_percent` in `docs/results/run_registry.json` and is calculated as `TP / (TP + FN)` for Synapse pancreas class `6`.
 
 Reference baseline from the earlier cleaned reproduction:
 
@@ -162,24 +166,39 @@ Save NIfTI predictions:
 python test.py --dataset Synapse --vit_name R50-ViT-B_16 --is_savenii
 ```
 
-Evaluation logs include `voxel_accuracy`, `foreground_voxel_accuracy`, `mean_foreground_accuracy`, and `pancreas_accuracy`. Use the foreground metrics for research comparisons because whole-volume voxel accuracy can be dominated by background.
+Full artifact export:
+
+```bash
+python test.py ^
+  --dataset Synapse ^
+  --vit_name R50-ViT-B_16 ^
+  --is_savenii ^
+  --run_id mscaf_cnn_fusion_3scale ^
+  --artifact_root artifacts/runs ^
+  --export_artifact_zip
+```
+
+Evaluation artifacts include `metrics.json`, `per_case_metrics.csv`, `per_class_metrics.csv`, `confusion_matrix.json`, NIfTI predictions/ground truth/images, and an artifact zip. Logs include `voxel_accuracy`, `foreground_voxel_accuracy`, `mean_foreground_accuracy`, `pancreas_accuracy`, and Jaccard/IoU fields (`mean_jaccard`, `pancreas.mean_jaccard`). The CSV exports include per-class and per-case `accuracy` plus `jaccard`. Use the foreground metrics for research comparisons because whole-volume voxel accuracy can be dominated by background.
 
 ## Colab notebooks
 
 For reproducibility on Google Colab:
 
 - [notebooks/transunet-drive-data-setup.ipynb](notebooks/transunet-drive-data-setup.ipynb): prepare the Synapse dataset and pretrained TransUNet weight on Google Drive
-- [notebooks/transunet-cnn-attention-research-colab.ipynb](notebooks/transunet-cnn-attention-research-colab.ipynb): run the primary MSCAF-TransUNet `cnn_fusion` experiment end-to-end
-- [notebooks/transunet-prehidden-1-16-rerun.ipynb](notebooks/transunet-prehidden-1-16-rerun.ipynb): completed non-RA `pre_hidden` run `02`; reuse only for the remaining fresh run `03`
-- [notebooks/transunet-reverse-bottleneck-fusion.ipynb](notebooks/transunet-reverse-bottleneck-fusion.ipynb): completed advisor-requested reverse attention + bottleneck fusion at the first `1/8` decoder merge
-- [notebooks/transunet-mscaf-reverse-attention.ipynb](notebooks/transunet-mscaf-reverse-attention.ipynb): historical completed Reverse Attention `s0/r4` artifact with retained metrics
+- [notebooks/01-baseline-transunet.ipynb](notebooks/01-baseline-transunet.ipynb): TransUNet baseline using the same old-git Colab training flow as the other notebooks
+- [notebooks/02-mscaf-cbam-da-ty-le.ipynb](notebooks/02-mscaf-cbam-da-ty-le.ipynb): MSCAF CBAM multi-scale fusion
+- [notebooks/03-cbam-truoc-patch-embedding-a.ipynb](notebooks/03-cbam-truoc-patch-embedding-a.ipynb): CBAM before patch embedding run A
+- [notebooks/04-cbam-truoc-patch-embedding-b.ipynb](notebooks/04-cbam-truoc-patch-embedding-b.ipynb): CBAM before patch embedding run B
+- [notebooks/05-cbam-reverse-attention-skip.ipynb](notebooks/05-cbam-reverse-attention-skip.ipynb): CBAM + Reverse Attention on the `1/8` skip feature
+- [notebooks/06-cbam-reverse-attention-sau-concat.ipynb](notebooks/06-cbam-reverse-attention-sau-concat.ipynb): CBAM + Reverse Attention after the first decoder-skip concat
+- [notebooks/07-cbam-truoc-patch-embedding-c.ipynb](notebooks/07-cbam-truoc-patch-embedding-c.ipynb): optional Synapse repeat for CBAM before patch embedding
 - [notebooks/transunet-calculate-artifact-accuracy.ipynb](notebooks/transunet-calculate-artifact-accuracy.ipynb): calculate accuracy for every retained prediction artifact without retraining; reports missing or ambiguous zips explicitly
 - [notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb](notebooks/transunet-evaluate-latest-checkpoint-accuracy.ipynb): rerun inference for the two latest retained checkpoints and export measured accuracy when prediction artifacts have already been deleted
 
 ## Artifact policy
 
 - Commit source code, split metadata, notebooks, and lightweight result registries.
-- Keep checkpoints, prediction volumes, compiled reports, generated figures, paper PDFs, and local work archives outside Git.
+- Keep full binary artifacts outside Git under `artifacts/runs/<run_id>/` and mirror the full run folder plus zip to Drive: checkpoints, prediction volumes or masks, ground truth volumes or masks, image volumes or images, logs, metrics, and manifests.
 - Reference retained binary outputs from README or `docs/results/` using Drive, Colab, or GitHub Release paths.
 
 ## Notes
