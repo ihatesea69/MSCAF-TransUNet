@@ -75,8 +75,8 @@ desktop.ini
 .$*.bkp
 
 # Large templates and intermediates (tai lai / build lai duoc)
-/Template.pptx
+# slides/Template.pptx la dependency cua khung_template.py nhung 14MB,
+# neu clone moi phai xin lai file nay.
+/slides/Template.pptx
 /slides/_thu_khung.pptx
 /slides/template_hoi_nghi/
-/slides/KLTN - Bao ve - Danh Hoang Hieu Nghi - K29.pptx
-/KLTN - Bao ve - Danh Hoang Hieu Nghi - K29 \[Repaired\].pptx

@@ -17,7 +17,7 @@ from pptx import Presentation
 from pptx.util import Inches
 
 GOC = os.path.dirname(os.path.abspath(__file__))
-MAU = os.path.join(os.path.dirname(GOC), "Template.pptx")
+MAU = os.path.join(GOC, "Template.pptx")
 
 # Khổ slide của mẫu
 W_THAT, H_THAT = 20.0, 11.25

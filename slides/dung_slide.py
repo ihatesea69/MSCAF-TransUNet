@@ -31,7 +31,8 @@ import khung_template as kt
 
 GOC = os.path.dirname(os.path.abspath(__file__))
 HINH = os.path.join(GOC, "hinh")
-RA = os.path.join(GOC, "KLTN - Bao ve - Danh Hoang Hieu Nghi - K29.pptx")
+RA = os.path.join(os.path.dirname(GOC), "luan_van",
+                 "KLTN - Bao ve - Danh Hoang Hieu Nghi - K29.pptx")
 
 # Hệ ảo 13,333 x 7,5 -> khổ mẫu 20 x 11,25
 K = 1.5
